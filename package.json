@@ -1,0 +1,15 @@
+{
+  "name": "pixelwar-server",
+  "version": "1.0.0",
+  "description": "Pixel War - otoriter çok oyunculu oyun sunucusu (sıfır bağımlılık)",
+  "main": "server.js",
+  "license": "UNLICENSED",
+  "private": true,
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test",
+    "sync": "node tools/sync-core.js",
+    "check-sync": "node tools/sync-core.js --check"
+  }
+}

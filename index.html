@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Pixel Strategy Game</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+        body {
+            background-image: url('map.png');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-color: #000000;
+            color: white;
+            font-family: 'Press Start 2P', monospace;
+            margin: 0;
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            box-sizing: border-box;
+            image-rendering: pixelated;
+        }
+
+        .top-container {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 30px;
+            background-color: rgba(0, 0, 0, 0.75);
+            padding: 15px;
+            border: 4px solid #fff;
+        }
+
+        .flag-section, .country-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+
+        #miniFlagCanvas {
+            border: 4px solid #fff;
+            background-color: white;
+            cursor: pointer;
+            image-rendering: pixelated;
+            width: 128px;
+            height: 85px;
+        }
+
+        .pixel-btn {
+            background-color: #2ecc71;
+            color: black;
+            border: 3px solid #fff;
+            padding: 8px 12px;
+            font-size: 10px;
+            font-family: 'Press Start 2P', monospace;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 3px 3px 0px #000;
+        }
+        .pixel-btn:hover {
+            background-color: #27ae60;
+            color: white;
+        }
+
+        #countryInput {
+            background-color: #d3d3d3;
+            border: 4px solid #fff;
+            padding: 12px 20px;
+            font-size: 12px;
+            font-family: 'Press Start 2P', monospace;
+            color: black;
+            text-align: center;
+            width: 280px;
+            outline: none;
+        }
+
+        .point-box {
+            background-color: #d3d3d3;
+            border: 4px solid #fff;
+            padding: 12px 20px;
+            font-size: 11px;
+            color: black;
+            box-shadow: 3px 3px 0px #000;
+        }
+
+        .menu-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
+            align-items: center;
+            margin-top: auto;
+            margin-bottom: auto;
+        }
+
+        .menu-btn {
+            background-color: #d3d3d3;
+            border: 4px solid #fff;
+            color: black;
+            font-size: 16px;
+            font-family: 'Press Start 2P', monospace;
+            padding: 15px 50px;
+            cursor: pointer;
+            box-shadow: 5px 5px 0px #000;
+            transition: 0.1s;
+        }
+        .menu-btn:hover {
+            background-color: #e0e0e0;
+            transform: translate(-2px, -2px);
+            box-shadow: 7px 7px 0px #000;
+        }
+
+        /* Bayrak ve Ayarlar Modalları */
+        #flagModal, #settingsModal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background-color: rgba(0, 0, 0, 0.95);
+            z-index: 1000;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+        }
+        #largeFlagCanvas {
+            border: 4px solid white;
+            background-color: white;
+            cursor: crosshair;
+            image-rendering: pixelated;
+            width: 480px;
+            height: 320px;
+        }
+        .editor-tools { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+        .tool-btn { padding: 8px 12px; font-size: 10px; font-family: 'Press Start 2P', monospace; background-color: #444; color: white; border: 2px solid white; cursor: pointer; }
+        .tool-btn.active { background-color: #007bff; }
+        .color-picker-container { display: flex; align-items: center; gap: 15px; background: #111; padding: 10px 20px; border: 2px solid #fff; }
+        .color-preview { width: 35px; height: 35px; border: 2px solid white; }
+        .slider-group { display: flex; flex-direction: column; gap: 5px; font-size: 9px; }
+        .slider-group label { display: flex; justify-content: space-between; gap: 10px; }
+        .modal-actions { display: flex; gap: 25px; margin-top: 5px; }
+        .action-icon-btn { width: 45px; height: 45px; font-size: 18px; font-weight: bold; border: 2px solid white; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .btn-cancel { background-color: #dc3545; color: white; }
+        .btn-save { background-color: #28a745; color: white; }
+        .settings-content { background-color: #111; border: 4px solid #fff; padding: 30px; display: flex; flex-direction: column; gap: 20px; align-items: center; width: 400px; box-shadow: 5px 5px 0px #000; }
+        .lang-options { display: flex; gap: 10px; }
+        .lang-btn { padding: 8px 15px; font-family: 'Press Start 2P', monospace; font-size: 10px; background-color: #444; color: white; border: 2px solid white; cursor: pointer; }
+        .lang-btn.active { background-color: #2ecc71; color: black; }
+        .dev-info { font-size: 9px; color: #aaa; text-align: center; margin-top: 10px; line-height: 1.5; }
+    </style>
+</head>
+<body>
+
+    <div class="top-container">
+        <div class="flag-section">
+            <canvas id="miniFlagCanvas" width="120" height="80" onclick="openFlagEditor()"></canvas>
+            <button class="pixel-btn" onclick="openFlagEditor()">EDIT FLAG</button>
+        </div>
+        <div class="country-section">
+            <input type="text" id="countryInput" placeholder="COUNTRY NAME">
+        </div>
+        <div class="point-box" id="pointBox">POINTS: 0</div>
+    </div>
+
+    <div class="menu-buttons">
+        <button class="menu-btn" onclick="playGame()">PLAY GAME</button>
+        <button class="menu-btn" onclick="goToSettings()">SETTINGS</button>
+    </div>
+
+    <!-- Piksel Bayrak Düzenleme Ekranı -->
+    <div id="flagModal">
+        <h2 style="font-size: 14px; margin: 0;">PIXEL FLAG EDITOR</h2>
+        <canvas id="largeFlagCanvas" width="120" height="80"></canvas>
+        <div class="editor-tools">
+            <button id="tool-brush" class="tool-btn active" onclick="setTool('brush')">BRUSH</button>
+            <button id="tool-bucket" class="tool-btn" onclick="setTool('bucket')">FILL</button>
+            <button id="tool-line" class="tool-btn" onclick="setTool('line')">LINE</button>
+            <button id="tool-rect" class="tool-btn" onclick="setTool('rect')">RECT</button>
+            <button id="tool-circle" class="tool-btn" onclick="setTool('circle')">CIRCLE</button>
+        </div>
+        <div class="color-picker-container">
+            <div id="colorPreview" class="color-preview" style="background-color: rgb(255, 0, 0);"></div>
+            <div class="slider-group">
+                <label>R: <span id="rVal">255</span> <input type="range" id="rangeR" min="0" max="255" value="255" oninput="updateColorFromSliders()"></label>
+                <label>G: <span id="gVal">0</span> <input type="range" id="rangeG" min="0" max="255" value="0" oninput="updateColorFromSliders()"></label>
+                <label>B: <span id="bVal">0</span> <input type="range" id="rangeB" min="0" max="255" value="0" oninput="updateColorFromSliders()"></label>
+            </div>
+        </div>
+        <div class="modal-actions">
+            <button class="action-icon-btn btn-cancel" onclick="closeFlagEditor(false)">✕</button>
+            <button class="action-icon-btn btn-save" onclick="closeFlagEditor(true)">✓</button>
+        </div>
+    </div>
+
+    <!-- Ayarlar Ekranı -->
+    <div id="settingsModal">
+        <div class="settings-content">
+            <h2 id="settingsTitle">SETTINGS</h2>
+            <div class="setting-group" style="display: flex; flex-direction: column; align-items: center; gap: 10px;">
+                <span id="langLabel">LANGUAGE:</span>
+                <div class="lang-options">
+                    <button id="langEn" class="lang-btn active" onclick="setLanguage('en')">English</button>
+                    <button id="langTr" class="lang-btn" onclick="setLanguage('tr')">Türkçe</button>
+                </div>
+            </div>
+            <div class="dev-info" id="devInfoText">DEVELOPER:<br>Oyunu sadece MR_OTTO geliştirdi.</div>
+            <button class="pixel-btn" onclick="closeSettings()" style="width: 100%; margin-top: 10px;" id="closeSettingsBtn">BACK</button>
+        </div>
+    </div>
+
+    <script>
+        const miniCanvas = document.getElementById('miniFlagCanvas');
+        const miniCtx = miniCanvas.getContext('2d');
+        const largeCanvas = document.getElementById('largeFlagCanvas');
+        const largeCtx = largeCanvas.getContext('2d');
+
+        // Görüntü kalitesini keskin tutmak için (pixelated render için)
+        miniCtx.imageSmoothingEnabled = false;
+        largeCtx.imageSmoothingEnabled = false;
+
+        miniCtx.fillStyle = 'white'; miniCtx.fillRect(0, 0, miniCanvas.width, miniCanvas.height);
+        largeCtx.fillStyle = 'white'; largeCtx.fillRect(0, 0, largeCanvas.width, largeCanvas.height);
+
+        let currentTool = 'brush';
+        let isDrawing = false;
+        let startX = 0, startY = 0;
+        let snapshot = null;
+        let r = 255, g = 0, b = 0;
+
+        // --- BAYRAK DÜZENLEYİCİ ---
+        function updateColorFromSliders() {
+            r = document.getElementById('rangeR').value;
+            g = document.getElementById('rangeG').value;
+            b = document.getElementById('rangeB').value;
+            document.getElementById('rVal').innerText = r;
+            document.getElementById('gVal').innerText = g;
+            document.getElementById('bVal').innerText = b;
+            document.getElementById('colorPreview').style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
+        }
+
+        function getSelectedColorString() { return `rgb(${r}, ${g}, ${b})`; }
+        
+        function openFlagEditor() { 
+            largeCtx.clearRect(0, 0, largeCanvas.width, largeCanvas.height);
+            largeCtx.drawImage(miniCanvas, 0, 0, largeCanvas.width, largeCanvas.height); 
+            document.getElementById('flagModal').style.display = 'flex'; 
+        }
+
+        function closeFlagEditor(save) {
+            if (save) { 
+                miniCtx.clearRect(0, 0, miniCanvas.width, miniCanvas.height); 
+                miniCtx.drawImage(largeCanvas, 0, 0, miniCanvas.width, miniCanvas.height); 
+            }
+            document.getElementById('flagModal').style.display = 'none';
+        }
+
+        function setTool(tool) {
+            currentTool = tool;
+            document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById('tool-' + tool).classList.add('active');
+        }
+
+        function getCanvasCoordinates(e) {
+            const rect = largeCanvas.getBoundingClientRect();
+            const scaleX = largeCanvas.width / rect.width;
+            const scaleY = largeCanvas.height / rect.height;
+            return {
+                x: Math.floor((e.clientX - rect.left) * scaleX),
+                y: Math.floor((e.clientY - rect.top) * scaleY)
+            };
+        }
+
+        largeCanvas.addEventListener('mousedown', (e) => {
+            isDrawing = true;
+            const coords = getCanvasCoordinates(e);
+            startX = coords.x; 
+            startY = coords.y;
+            
+            if (currentTool === 'brush') {
+                drawPixel(coords.x, coords.y);
+            } else if (currentTool === 'bucket') {
+                handleBucketFill(coords.x, coords.y);
+                isDrawing = false;
+            } else {
+                snapshot = largeCtx.getImageData(0, 0, largeCanvas.width, largeCanvas.height);
+            }
+        });
+
+        window.addEventListener('mouseup', (e) => {
+            if (!isDrawing) return;
+            isDrawing = false;
+            if (['line', 'rect', 'circle'].includes(currentTool)) {
+                const coords = getCanvasCoordinates(e);
+                drawShape(coords.x, coords.y);
+            }
+        });
+
+        largeCanvas.addEventListener('mousemove', (e) => {
+            if (!isDrawing) return;
+            const coords = getCanvasCoordinates(e);
+            if (currentTool === 'brush') {
+                drawPixel(coords.x, coords.y);
+            } else if (['line', 'rect', 'circle'].includes(currentTool)) {
+                if (snapshot) {
+                    largeCtx.putImageData(snapshot, 0, 0);
+                    drawShape(coords.x, coords.y);
+                }
+            }
+        });
+
+        function drawPixel(x, y) {
+            if (x >= 0 && x < largeCanvas.width && y >= 0 && y < largeCanvas.height) {
+                largeCtx.fillStyle = getSelectedColorString();
+                largeCtx.fillRect(x, y, 1, 1);
+            }
+        }
+
+        function drawShape(endX, endY) {
+            largeCtx.fillStyle = getSelectedColorString();
+            largeCtx.strokeStyle = getSelectedColorString();
+            largeCtx.lineWidth = 1;
+
+            if (currentTool === 'rect') {
+                let width = endX - startX;
+                let height = endY - startY;
+                largeCtx.fillRect(startX, startY, width, height);
+            } else if (currentTool === 'line') {
+                largeCtx.beginPath();
+                largeCtx.moveTo(startX + 0.5, startY + 0.5);
+                largeCtx.lineTo(endX + 0.5, endY + 0.5);
+                largeCtx.stroke();
+            } else if (currentTool === 'circle') {
+                let radius = Math.round(Math.hypot(endX - startX, endY - startY));
+                largeCtx.beginPath();
+                largeCtx.arc(startX, startY, radius, 0, 2 * Math.PI);
+                largeCtx.fill();
+            }
+        }
+
+        function handleBucketFill(startX, startY) {
+            const imgData = largeCtx.getImageData(0, 0, largeCanvas.width, largeCanvas.height);
+            const data = imgData.data;
+            const width = largeCanvas.width;
+            const height = largeCanvas.height;
+
+            const targetIdx = (startY * width + startX) * 4;
+            const targetR = data[targetIdx];
+            const targetG = data[targetIdx + 1];
+            const targetB = data[targetIdx + 2];
+            const targetA = data[targetIdx + 3];
+
+            const fillR = parseInt(r);
+            const fillG = parseInt(g);
+            const fillB = parseInt(b);
+            const fillA = 255;
+
+            if (targetR === fillR && targetG === fillG && targetB === fillB && targetA === fillA) return;
+
+            const queue = [[startX, startY]];
+            const visited = new Uint8Array(width * height);
+
+            while (queue.length > 0) {
+                const [cx, cy] = queue.pop();
+                if (cx < 0 || cx >= width || cy < 0 || cy >= height) continue;
+                
+                const idx = cy * width + cx;
+                if (visited[idx]) continue;
+                visited[idx] = 1;
+
+                const currIdx = (cy * width + cx) * 4;
+                if (
+                    data[currIdx] === targetR &&
+                    data[currIdx + 1] === targetG &&
+                    data[currIdx + 2] === targetB &&
+                    data[currIdx + 3] === targetA
+                ) {
+                    data[currIdx] = fillR;
+                    data[currIdx + 1] = fillG;
+                    data[currIdx + 2] = fillB;
+                    data[currIdx + 3] = fillA;
+
+                    queue.push([cx + 1, cy]);
+                    queue.push([cx - 1, cy]);
+                    queue.push([cx, cy + 1]);
+                    queue.push([cx, cy - 1]);
+                }
+            }
+
+            largeCtx.putImageData(imgData, 0, 0);
+        }
+
+        // --- OYUNA GEÇİŞ: ülke adını game.html'e (lobi) aktar ---
+        function playGame() {
+            const name = document.getElementById('countryInput').value.trim();
+            try { localStorage.setItem('px_country', name); } catch (e) { /* depolama kapalı */ }
+            window.location.href = 'game.html';
+        }
+        (function restoreCountry() {
+            try {
+                const saved = localStorage.getItem('px_country');
+                if (saved) document.getElementById('countryInput').value = saved;
+                document.getElementById('countryInput').addEventListener('input', function (e) {
+                    localStorage.setItem('px_country', e.target.value.trim());
+                });
+            } catch (e) { /* depolama kapalı */ }
+        })();
+
+        // --- AYARLAR VE DİL ---
+        function goToSettings() { document.getElementById('settingsModal').style.display = 'flex'; }
+        function closeSettings() { document.getElementById('settingsModal').style.display = 'none'; }
+        
+        function setLanguage(lang) {
+            document.getElementById('langEn').classList.remove('active');
+            document.getElementById('langTr').classList.remove('active');
+            if (lang === 'en') {
+                document.getElementById('langEn').classList.add('active');
+                document.getElementById('settingsTitle').innerText = "SETTINGS";
+                document.getElementById('langLabel').innerText = "LANGUAGE:";
+                document.getElementById('closeSettingsBtn').innerText = "BACK";
+                document.getElementById('devInfoText').innerHTML = "DEVELOPER:<br>Oyunu sadece MR_OTTO geliştirdi.";
+            } else {
+                document.getElementById('langTr').classList.add('active');
+                document.getElementById('settingsTitle').innerText = "AYARLAR";
+                document.getElementById('langLabel').innerText = "DİL SEÇENEĞİ:";
+                document.getElementById('closeSettingsBtn').innerText = "GERİ";
+                document.getElementById('devInfoText').innerHTML = "GELİŞTİRİCİ:<br>Sadece MR_OTTO tarafından geliştirildi.";
+            }
+        }
+    </script>
+</body>
+</html>
