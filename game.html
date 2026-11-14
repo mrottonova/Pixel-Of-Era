@@ -2,7 +2,28 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <script>
+    /* GÖRÜNÜM (Masaüstü / Mobil) — index.html ve game.html ortak. Tercih localStorage 'px_layout'.
+       Masaüstü: sabit orantılı 1100px ölçek (telefonda küçülterek sığdırır). Mobil: esnek, ekrana yayılan düzen. */
+    (function () {
+        var KEY = 'px_layout', root = document.documentElement;
+        function stored() { try { var v = localStorage.getItem(KEY); return (v === 'mobile' || v === 'desktop') ? v : null; } catch (e) { return null; } }
+        function auto() { try { return (matchMedia('(pointer:coarse)').matches || Math.min(screen.width, screen.height) < 700) ? 'mobile' : 'desktop'; } catch (e) { return 'desktop'; } }
+        function apply(m) {
+            window.PX_LAYOUT = m;
+            root.classList.remove('layout-desktop', 'layout-mobile'); root.classList.add('layout-' + m);
+            var v = document.querySelector('meta[name="viewport"]');
+            if (v) v.setAttribute('content', m === 'desktop' ? 'width=1100' : 'width=device-width, initial-scale=1, viewport-fit=cover');
+            var bs = document.querySelectorAll('[data-layout]');
+            for (var i = 0; i < bs.length; i++) bs[i].classList.toggle('active', bs[i].getAttribute('data-layout') === m);
+            try { window.dispatchEvent(new Event('pxlayout')); } catch (e) { /* */ }
+        }
+        window.pxSetLayout = function (m) { m = (m === 'mobile') ? 'mobile' : 'desktop'; try { localStorage.setItem(KEY, m); } catch (e) { /* */ } apply(m); };
+        window.pxSyncLayoutButtons = function () { apply(window.PX_LAYOUT); };
+        window.PX_LAYOUT = stored() || auto(); apply(window.PX_LAYOUT);
+    })();
+    </script>
     <title>Pixel Europe Strategy Game - Çok Oyunculu</title>
     <!-- Sunucu (server.js) bu etikete kendi wss:// adresini yazar. Statik barındırıyorsan buraya
          kendi adresini yaz: content="wss://oyun.siten.com/ws"  (boş = çevrimdışı/botlu mod) -->
@@ -427,7 +448,7 @@
         .chat-msg.news { border-left: 3px solid #f39c12; padding-left: 6px; background: rgba(30,41,59,0.6); }
         .chat-msg.news.war { border-left-color: #e74c3c; } .chat-msg.news.peace { border-left-color: #2ecc71; } .chat-msg.news.ally { border-left-color: #3498db; }
 
-        #chat1v1Window { height: 480px; }
+        #chat1v1Window { height: 500px; }
         #diplomacyWindow { height: 420px; }
         .diplo-actions { padding: 8px 10px; border-bottom: 2px solid #475569; display: flex; flex-direction: column; gap: 6px; font-size: 7px; }
         .diplo-status { color: #f39c12; line-height: 1.6; }
@@ -446,7 +467,73 @@
         /* pencereler sağdaki gazete alt-menüsünü örtmesin; küçük ekranlarda taşmasın */
         .system-window { top: 215px; max-height: calc(100vh - 235px); }
 
+        /* ================= v2: bayrak (30x15 KİLİTLİ), renk çarkı, fetih, gazete ================= */
+        .flag30 { width: 30px; height: 15px; min-width: 30px; flex: none; image-rendering: pixelated; border: 1px solid #000; background: #334155; display: inline-block; vertical-align: middle; }
+        .lobby-cols { display: grid; grid-template-columns: 290px 1fr; gap: 14px; text-align: left; align-items: start; }
+        .lobby-container { max-height: 94vh; overflow-y: auto; }
+        #waitPanel .lobby-container, #lobbyBox { width: auto; max-width: 760px; }
+        #wheelBox { position: relative; width: 280px; height: 280px; margin: 6px auto; }
+        #wheelBox svg { position: absolute; inset: 0; pointer-events: none; }
+        .sw { position: absolute; width: 26px; height: 26px; margin: -13px 0 0 -13px; border: 2px solid #0b1220; border-radius: 50%; cursor: pointer; padding: 0; box-shadow: 0 0 0 1px rgba(255,255,255,0.25); }
+        .sw:hover:not(.taken) { transform: scale(1.18); border-color: #fff; }
+        .sw.mine { border: 3px solid #fff; box-shadow: 0 0 0 3px #2ecc71; }
+        .sw.taken { cursor: not-allowed; opacity: 0.45; }
+        .sw.taken::before, .sw.taken::after { content: ''; position: absolute; left: 50%; top: -3px; width: 3px; height: 28px; background: #e74c3c; border: 1px solid #000; transform: translateX(-50%) rotate(45deg); }
+        .sw.taken::after { transform: translateX(-50%) rotate(-45deg); }
+        .rank-table { display: grid; gap: 4px; margin-top: 10px; max-height: 300px; overflow-y: auto; text-align: left; }
+        .rank-row { display: grid; grid-template-columns: 26px 36px 1fr 70px 70px; gap: 6px; align-items: center; font-size: 8px; background: #1e293b; border: 2px solid #475569; padding: 6px; }
+        .rank-row.me { border-color: #2ecc71; } .rank-row.top { border-color: #f1c40f; }
+        .pts-box { font-size: 8px; text-align: center; line-height: 1.6; border: 3px solid #f1c40f; padding: 5px 9px; color: #f1c40f; background: #0b1220; }
+        .pts-box span { font-size: 14px; color: #fff; }
+        #captureBarWrap { position: fixed; left: 0; right: 0; bottom: 0; height: 12px; background: rgba(0,0,0,0.7); border-top: 2px solid #f39c12; z-index: 70; pointer-events: none; display: none; }
+        #captureBar { height: 100%; width: 0%; background: repeating-linear-gradient(45deg, #2ecc71 0 8px, #27ae60 8px 16px); }
+        #captureLabel { position: absolute; left: 50%; top: -14px; transform: translateX(-50%); font-size: 7px; color: #fff; text-shadow: 1px 1px 0 #000; }
+        #capitalPrompt { display: none; position: fixed; left: 50%; bottom: 118px; transform: translateX(-50%); z-index: 75; background: rgba(15,23,42,0.98); border: 3px solid #2ecc71; padding: 10px 14px; font-size: 9px; align-items: center; gap: 12px; box-shadow: 4px 4px 0 #000; }
+        #leftNewspaperChat { pointer-events: none; }
+        #leftNewspaperChat .chat-messages { pointer-events: auto; overflow-y: auto; }
+        #leftNewspaperChat.collapsed .chat-messages { display: none; }
+        #leftNewspaperChat.collapsed { height: auto !important; }
+        .news-item { display: flex; align-items: flex-start; gap: 6px; padding: 5px 6px; margin-bottom: 4px; background: rgba(30,41,59,0.6); border-left: 3px solid #f39c12; font-size: 7px; line-height: 1.6; }
+        .news-item.war { border-left-color: #e74c3c; } .news-item.peace { border-left-color: #2ecc71; } .news-item.ally { border-left-color: #3498db; }
+        .news-item .who { display: flex; flex-direction: column; gap: 2px; flex: none; }
+        .news-item .nm { flex: none; max-width: 90px; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .news-item .tx { flex: 1; text-align: right; word-break: break-word; color: #e2e8f0; }
+        .country-item .flag30 { margin-right: 2px; }
+        .lock-note { font-size: 7px; color: #f1c40f; line-height: 1.6; }
+
         .lobby-container .pixel-btn { justify-content: center; }
+
+        /* ================= GÖRÜNÜM: MASAÜSTÜ / MOBİL + DOKUNMATİK ================= */
+        html, body { overscroll-behavior: none; }
+        #gameCanvas { touch-action: none; -webkit-tap-highlight-color: transparent; }
+        .layout-toggle { position: fixed; top: 8px; right: 8px; z-index: 900; display: flex; align-items: center; gap: 6px; background: rgba(8, 14, 32, 0.95); border: 3px solid #fff; padding: 4px 6px; box-shadow: 3px 3px 0 #000; font-size: 7px; }
+        .lt-btn { font-family: 'Press Start 2P', monospace; font-size: 7px; padding: 7px 8px; background: #334155; color: #fff; border: 2px solid #fff; cursor: pointer; }
+        .lt-btn.active { background: #2ecc71; color: #000; }
+        html.layout-mobile .lt-label { display: none; }
+        html.layout-mobile #lobbyOverlay { height: 100dvh; }
+        html.layout-mobile #lobbyBox, html.layout-mobile #overOverlay .lobby-container { width: 98vw; max-width: min(98vw, 600px); padding: 12px; box-sizing: border-box; margin-top: 34px; max-height: calc(100dvh - 48px); border-width: 3px; }
+        html.layout-mobile .lobby-cols { grid-template-columns: 1fr; }
+        html.layout-mobile #lobbyBox input { width: 100%; box-sizing: border-box; }
+        html.layout-mobile .btn-row { flex-wrap: wrap; }
+        html.layout-mobile .bigCount { font-size: 26px; }
+        html.layout-mobile .roster { grid-template-columns: 1fr 1fr; max-height: 150px; }
+        html.layout-mobile .top-hud { top: 6px; left: 6px; right: 52px; gap: 4px; flex-wrap: wrap; justify-content: flex-start; }
+        html.layout-mobile .hud-box { padding: 6px 8px; font-size: 7px; border-width: 2px; box-shadow: 2px 2px 0 #000; }
+        html.layout-mobile .bottom-hud { left: 6px; right: 6px; bottom: 6px; transform: none; padding: 8px; gap: 8px; flex-wrap: wrap; justify-content: center; border-width: 3px; box-shadow: 3px 3px 0 #000; }
+        html.layout-mobile .dice { width: 28px; height: 28px; }
+        html.layout-mobile #turnStatus { max-width: 100% !important; flex-basis: 100%; text-align: center; font-size: 7px !important; order: 5; }
+        html.layout-mobile .bottom-hud .pixel-btn { font-size: 8px; padding: 9px 10px; }
+        html.layout-mobile #leftNewspaperChat { top: 62px; left: 6px; width: min(54vw, 240px); height: 24vh; }
+        html.layout-mobile #rightSideSystem { top: 62px; right: 6px; }
+        html.layout-mobile .system-window { top: 100px; left: 6px; right: 6px; width: auto; height: min(62vh, 420px); max-height: calc(100dvh - 140px); }
+        html.layout-mobile #chat1v1Window, html.layout-mobile #diplomacyWindow { height: min(66vh, 480px); }
+        html.layout-mobile #capitalPrompt { bottom: 132px; width: 94vw; box-sizing: border-box; flex-wrap: wrap; justify-content: center; }
+        html.layout-mobile #giftBar { width: 94vw; box-sizing: border-box; flex-wrap: wrap; justify-content: center; top: 100px; }
+        html.layout-mobile #toastBox { top: 56px; }
+        html.layout-mobile .toast { max-width: 92vw; }
+        html.layout-mobile .rank-row { grid-template-columns: 22px 32px 1fr 52px 60px; font-size: 7px; gap: 4px; }
+        html.layout-mobile .diplo-grid { gap: 6px; }
+        html.layout-mobile .dbtn { padding: 10px 4px; font-size: 7px; }
     </style>
 </head>
 <body>
@@ -454,43 +541,58 @@
     <div id="netBanner"></div>
     <div id="toastBox"></div>
 
-    <!-- Lobi: ad + renk + sunucu, ardından bekleme odası (10 oyuncu -> 20sn geri sayım) -->
+    <!-- Giriş (ana menüden gelinmediyse) ve Lobi: bekleme odası + RENK ÇARKI (renk yalnızca burada seçilir) -->
     <div id="lobbyOverlay">
-        <div class="lobby-container">
+        <div class="layout-toggle">
+            <span class="lt-label">GÖRÜNÜM:</span>
+            <button class="lt-btn" data-layout="desktop" onclick="pxSetLayout('desktop')">MASAÜSTÜ</button>
+            <button class="lt-btn" data-layout="mobile" onclick="pxSetLayout('mobile')">MOBİL</button>
+        </div>
+        <div class="lobby-container" id="lobbyBox">
             <div id="joinPanel">
-                <h2 style="font-size: 14px; color: #f39c12; margin-bottom: 10px;">Ülkenin adını ve rengini seç</h2>
+                <h2 style="font-size: 14px; color: #f39c12; margin-bottom: 10px;">Savaşa Katıl</h2>
                 <div class="lobby-label">ÜLKE ADI</div>
                 <input type="text" id="nameInput" maxlength="16" placeholder="ÜLKE ADI" autocomplete="off">
-                <div class="lobby-label">RENK</div>
-                <div class="nation-grid" id="nationSelectionList">
-                    <!-- Dinamik olarak doldurulacak -->
-                </div>
-                <div class="custom-color-row"><span>ÖZEL RENK (10'dan fazla oyuncu için)</span><input type="color" id="customColor" value="#ff00ff"></div>
+                <div class="lobby-label">BAYRAĞIN (ana menüde düzenlenir)</div>
+                <div style="text-align:left;"><img id="joinFlagPreview" class="flag30" alt="bayrak"></div>
                 <div class="lobby-label">SUNUCU (boş bırakırsan ÇEVRİMDIŞI, botlarla oynarsın)</div>
                 <input type="text" id="serverInput" placeholder="wss://oyun.siten.com/ws" autocomplete="off" spellcheck="false">
                 <div id="lobbyError"></div>
                 <div class="btn-row">
-                    <button class="pixel-btn pixel-btn-success" id="joinGameBtn" onclick="confirmNationSelection()" disabled>SAVAŞA KATIL</button>
+                    <button class="pixel-btn pixel-btn-success" id="joinGameBtn" onclick="joinFromForm()">KATIL</button>
                     <button class="pixel-btn pixel-btn-mode" onclick="location.href='index.html'">ANA MENÜ</button>
                 </div>
             </div>
             <div id="waitPanel" style="display:none;">
-                <h2 style="font-size: 14px; color: #f39c12;">LOBİ</h2>
+                <h2 style="font-size: 14px; color: #f39c12;" id="waitTitle">LOBİ</h2>
                 <div class="lobby-hint" id="waitMode"></div>
                 <div class="bigCount" id="waitBig"></div>
                 <div class="lobby-hint" id="waitHint"></div>
-                <div class="roster" id="roster"></div>
+                <div class="lobby-cols">
+                    <div>
+                        <div class="lobby-label">ÜLKE RENGİNİ SEÇ (lobide; alınan renkler ✕)</div>
+                        <div id="wheelBox"></div>
+                        <div class="lobby-hint" id="wheelHint"></div>
+                    </div>
+                    <div>
+                        <div class="lobby-label" id="rosterLabel">OYUNCULAR</div>
+                        <div class="roster" id="roster"></div>
+                    </div>
+                </div>
+                <div id="lobbyError2" style="color:#e74c3c;font-size:8px;min-height:12px;"></div>
                 <button class="pixel-btn" style="margin:0 auto;" onclick="leaveToMenu()">AYRIL</button>
             </div>
         </div>
     </div>
 
     <div id="overOverlay">
-        <div class="lobby-container">
+        <div class="lobby-container" style="width:520px;">
             <h2 style="font-size: 16px; color: #f39c12;">OYUN BİTTİ</h2>
-            <div class="bigCount" style="font-size:16px; line-height:1.6;" id="overWinner"></div>
+            <div class="bigCount" style="font-size:12px; line-height:1.6;" id="overWinner"></div>
             <div class="lobby-hint" id="overReason"></div>
-            <div class="btn-row"><button class="pixel-btn pixel-btn-success" onclick="leaveToMenu()">YENİDEN OYNA</button></div>
+            <div id="overTable" class="rank-table"></div>
+            <div class="lobby-hint" id="overExp" style="color:#f1c40f;margin-top:10px;"></div>
+            <div class="btn-row"><button class="pixel-btn pixel-btn-success" onclick="leaveToMenu()">YENİDEN OYNA</button><button class="pixel-btn pixel-btn-mode" onclick="location.href='index.html'">ANA MENÜ</button></div>
         </div>
     </div>
 
@@ -500,13 +602,13 @@
         <div class="hud-box" id="playerInfo">KALAN PİKSEL: 25</div>
     </div>
 
-    <div id="giftBar"><span id="giftBarText"></span><button class="pixel-btn" onclick="exitGiftMode()">BİTİR</button></div>
+    <div id="giftBar"><span id="giftBarText"></span><button class="pixel-btn pixel-btn-success" onclick="confirmGift()">GÖNDER</button><button class="pixel-btn" onclick="exitGiftMode()">İPTAL</button></div>
 
     <canvas id="gameCanvas"></canvas>
 
     <!-- SOL TARAF GAZETE CHAT'İ (ŞEFFAF ARAYÜZ) -->
     <div id="leftNewspaperChat">
-        <div class="chat-header">GAZETE HABERLERİ</div>
+        <div class="chat-header">GAZETE HABERLERİ <span id="newsToggle" onclick="toggleNews()" title="Daralt/Genişlet" style="cursor:pointer;float:right;pointer-events:auto;">▼</span></div>
         <div class="chat-messages" id="newspaperChatMessages">
             <!-- Mesajlar buraya akacak -->
         </div>
@@ -526,6 +628,9 @@
             </button>
             <button class="sub-btn" onclick="openWindow('gazetteWriteWindow')">
                 GAZETE YAZISI
+            </button>
+            <button class="sub-btn" id="layoutSubBtn" onclick="pxSetLayout(window.PX_LAYOUT === 'mobile' ? 'desktop' : 'mobile')">
+                GÖRÜNÜM: MOBİL
             </button>
         </div>
     </div>
@@ -559,7 +664,7 @@
     <!-- PENCERE: 1v1 DİPLOMASİ (butonlar + özel mesajlaşma) -->
     <div id="chat1v1Window" class="system-window">
         <div class="window-header">
-            <span id="chat1v1Title">1v1 DİPLOMASİ</span>
+            <span id="chat1v1Title" style="display:flex;align-items:center;gap:6px;">1v1 DİPLOMASİ</span>
             <span class="close-btn" onclick="closeWindow('chat1v1Window')">X</span>
         </div>
         <div class="diplo-actions" id="diploActions"></div>
@@ -580,22 +685,32 @@
 
         <!-- FIRÇA MODU SEÇENEĞİ -->
         <button class="pixel-btn pixel-btn-mode" id="brushToggleBtn" onclick="toggleBrushMode()"><span>🖌️</span> MOD: FIRÇA</button>
+        <button class="pixel-btn" id="relocBtn" style="display:none;" onclick="toggleRelocate()">🚩 BAŞKENT TAŞI (−2)</button>
 
         <div id="turnStatus" style="font-size: 8px; line-height: 1.6; max-width: 250px;">
             Haritadan başkentini seçmek için kara parçasına tıkla!
         </div>
         <div id="turnTimer" class="timer-highlight" style="font-size: 10px;">30s</div>
-        <button class="pixel-btn" id="endTurnBtn" onclick="forceEndTurn()" disabled>TURU BİTİR</button>
+        <div id="ptsBox" class="pts-box" title="Genişleme puanı: 1 puan = 1 piksel fethi">PUAN<br><span id="ptsVal">0</span></div>
     </div>
+
+    <!-- Başkent onayı (alt çubuk) -->
+    <div id="capitalPrompt">
+        <span id="capitalPromptText">Bu başkenti onaylıyor musunuz?</span>
+        <button class="pixel-btn pixel-btn-success" onclick="capitalAnswer(true)">EVET</button>
+        <button class="pixel-btn" onclick="capitalAnswer(false)">HAYIR</button>
+    </div>
+
+    <!-- Zamanlı fetih ilerleme çubuğu (ekranın altı) -->
+    <div id="captureBarWrap"><div id="captureBar"></div><span id="captureLabel"></span></div>
 
     <!-- PAYLAŞILAN OYUN ÇEKİRDEĞİ: server/core.js ile BİREBİR aynı olmalı (npm run sync) -->
     <script id="px-core">
 /* ============================================================================
- *  PIXEL WAR  -  CORE  (tarayıcı istemcisi ve Node sunucusu TARAFINDAN PAYLAŞILIR)
+ *  PIXEL WAR  -  CORE v2  (tarayıcı istemcisi ve Node sunucusu TARAFINDAN PAYLAŞILIR)
  *  ----------------------------------------------------------------------------
- *  - DOM / ağ / zamanlayıcı YOK: tamamen deterministik, "tick" (1 sn) ile ilerler.
+ *  - DOM / ağ / gerçek zamanlayıcı YOK: deterministik, advance(ms) ile ilerler.
  *  - Oyun kurallarının TEK doğruluk kaynağı burasıdır (otoriter sunucu modeli).
- *    İstemci sadece niyet (intent) gönderir; sunucu doğrular ve sonucu yayınlar.
  *  - Aynı dosya game.html içindeki <script id="px-core"> bloğunda ve
  *    server/core.js içinde BİREBİR aynı olmalıdır (npm run sync / npm test kontrol eder).
  * ========================================================================== */
@@ -606,49 +721,120 @@
   'use strict';
 
   /* ------------------------------------------------------------------ CONFIG */
-  const PROTOCOL = 1;
+  const PROTOCOL = 2;
 
   const CONFIG = {
-    MIN_PLAYERS: 10,          // geri sayımın başlaması için gereken minimum oyuncu
-    MAX_PLAYERS: 16,
-    LOBBY_COUNTDOWN: 20,      // sn  (10 oyuncuya ulaşınca)
-    SETUP_SECONDS: 30,        // sn  (başkent + yerleşim fazı)
-    ROUND_SECONDS: 60,        // sn  (eşzamanlı tur süresi)
-    MIN_ROUND_SECONDS: 3,     // herkes "turu bitir" dese bile en az bu kadar sür
-    START_POOL: 25,           // başkent dahil başlangıç piksel sayısı
-    MAX_ACTIONS: 20,          // zar (d6*d6) üst sınırı
-    WAR_DELAY_ROUNDS: 1,      // savaş ilanından kaç tur sonra aktifleşir
-    PROPOSAL_TTL_ROUNDS: 2,   // teklif kaç tur geçerli
-    MAX_ROUNDS: 40,           // güvenlik: bu turdan sonra puana göre biter
-    SETUP_FREE_PLACEMENT: true, // true: yerleşimde boş herhangi bir karaya; false: sadece komşu
+    MIN_PLAYERS: 10,            // oyun başlama eşiği
+    MAX_PLAYERS: 20,            // oda kapasitesi
+    LOBBY_COUNTDOWN: 20,        // sn: 10 oyuncuya ulaşınca
+    LOBBY_WAIT_SECONDS: 60,     // sn: 10'a ulaşılamazsa botlarla doldur ve hemen başlat
+    BOT_FILL_TO: 10,            // doldurma hedefi (20 yaparsan oda tamamen dolar)
+    SETUP_SECONDS: 30,          // başkent + ilk yerleşim
+    ROUND_SECONDS: 30,          // 1 TUR = 30 sn = zar atışı aralığı
+    START_POOL: 25,             // başkent dahil başlangıç pikseli (anlık yerleşim)
+    MAX_DICE_POINTS: 20,        // zar (d6*d6) üst sınırı = tur başına genişleme puanı
+    MAX_POINTS: 120,            // biriktirilebilen puan üst sınırı
+    CAPTURE_MS_FREE: 1000,      // katı sıralı fetih: her hücre en az 1 sn
+    CAPTURE_MS_SEA: 1000,       // deniz çıkarma hücresi de 1 sn
+    CAPTURE_MS_ENEMY: 1000,     // düşman pikseli: 1.0 sn
+    MAX_QUEUE: 40,              // aynı anda kuyruktaki fetih sayısı
+    ATTRITION_STEP: 10,         // savunan, saldırana her 10 piksel kaybettiğinde yıpranma zarı
+    ATTRITION_CHANCE: 0.5,
+    ATTRITION_LOSS_SINGLE: 2,   // tek cephe: isabette -2 puan
+    ATTRITION_LOSS_MULTI: 1,    // çok cephe: cephe başına isabette -1 puan
+    SIEGE_LOSS: 2,              // kuşatılan başkent: tur başına -2 puan
+    SIEGE_RADIUS: 2,            // başkente bu mesafedeki (Chebyshev) fetih = kuşatma
+    PACT_LOCK_ROUNDS: 5,        // barış / ittifak kilidi (tur)
+    WAR_DELAY_ROUNDS: 1,
+    PROPOSAL_TTL_ROUNDS: 3,
+    MAX_ROUNDS: 60,
+    SETUP_FREE_PLACEMENT: false,   // v3: ilk yerleşim de başkente/kendi toprağına BİTİŞİK olmalı (bağlantısız toprak yok)
     MAX_CELLS_PER_MESSAGE: 64,
     NAME_MAX: 16,
     CHAT_MAX: 60,
-    CHAT_COOLDOWN_TICKS: 3,   // sunucu tarafı spam koruması (istemci 4 sn gösterir)
-    COLOR_MIN_DISTANCE: 40,   // oyuncu renkleri arası min. RGB mesafesi
-    COLOR_RESERVED_DISTANCE: 30, // deniz / boş kara rengine min. mesafe
-    GAME_OVER_SECONDS: 20,    // oyun bittikten sonra oda kaç sn açık kalsın
-    EMPTY_ROOM_SECONDS: 60    // oyuncusuz oda ömrü (Room)
+    CHAT_COOLDOWN_MS: 5000,     // gazete duyurusu
+    DM_COOLDOWN_MS: 3000,       // diplomasi özel mesajı
+    CAPITAL_RELOC_SECONDS: 30,  // yeni başkent seçme süresi (barış sonrası)
+    EXP_REWARDS: [50, 40, 30, 20, 10],
+    GAME_OVER_SECONDS: 25,
+    EMPTY_ROOM_SECONDS: 60,
+    REJECT_FLOOD: 250,          // 10 sn içinde bu kadar ret = şüpheli (sunucu atar)
+    /* ---- v3 kuralları ---- */
+    RATE_TIER1_MAX: 50,         // S < 50  -> 1 piksel/sn
+    RATE_TIER2_MAX: 100,        // 50 <= S < 100 -> 2 piksel/sn ; S >= 100 -> 3 piksel/sn
+    WAR_PROTECTION_ROUNDS: 5,   // ilk 5 tur: savaş ilanı ve işgal yasak
+    FLAG_PENALTY: 2,            // bayrak (başkent) kaybı / manuel taşıma bedeli (puan)
+    DEBT_FLOOR: -2,             // bakiye en fazla -2'ye düşebilir (borç); borç bitene dek yeni genişleme yok
+    GIFT_MAX_CELLS: 3,          // tek seferde en fazla 3 piksel devri
+    GIFT_COOLDOWN_ROUNDS: 5,    // devir sonrası 5 tur bekleme
+    /* ---- v4: deniz hareketi ---- */
+    NAVAL_UNLOCK_MS: 5000,      // oyun başladıktan (kurulum bittikten) sonra deniz hareketi 5 sn kilitli
+    SEA_HOLD_MS: 5000           // alınan deniz hücresi 5 sn sonra geri döner (geçici köprü)
   };
 
   const SEA_COLOR = '#2980b9';
   const LAND_COLOR = '#2c3e50';
 
-  const NATIONS = [
-    { id: 1, name: 'MAVİ', color: '#3498db' },
-    { id: 2, name: 'KIRMIZI', color: '#e74c3c' },
-    { id: 3, name: 'YEŞİL', color: '#2ecc71' },
-    { id: 4, name: 'SARI', color: '#f1c40f' },
-    { id: 5, name: 'MOR', color: '#9b59b6' },
-    { id: 6, name: 'TURUNCU', color: '#e67e22' },
-    { id: 7, name: 'TURKUAZ', color: '#1abc9c' },
-    { id: 8, name: 'PEMBE', color: '#e84393' },
-    { id: 9, name: 'KAHVERENGİ', color: '#5d4037' },
-    { id: 10, name: 'TENRENGİ', color: '#ffeaa7' }
-  ];
-
   const BOT_NAMES = ['ANADOLU', 'TRAKYA', 'İBERYA', 'GALYA', 'ROMA', 'SLAV', 'VİKİNG', 'KELT',
-    'HUN', 'PERS', 'BİZANS', 'ARAGON', 'BAVYERA', 'LİTVANYA', 'KASTİLYA', 'SAKSONYA'];
+    'HUN', 'PERS', 'BİZANS', 'ARAGON', 'BAVYERA', 'LİTVANYA', 'KASTİLYA', 'SAKSONYA',
+    'PRUSYA', 'FRANK', 'LOMBARD', 'NORMAN'];
+
+  /* ------------------------------------------------------------------ BAYRAK */
+  const FLAG_W = 30, FLAG_H = 15;                    // bayrak oranı 30x15'e KİLİTLİ
+  const FLAG_B64_LEN = FLAG_W * FLAG_H * 4;           // 450 piksel * 3 bayt = 1350 bayt -> 1800 base64 karakteri
+  function validateFlag(s) {
+    return (typeof s === 'string' && s.length === FLAG_B64_LEN && /^[A-Za-z0-9+/]+$/.test(s)) ? s : '';
+  }
+
+  /* --------------------------------------------------------------- RENK ÇARKI */
+  function hslToHex(h, s, l) {
+    s /= 100; l /= 100;
+    const k = (n) => (n + h / 30) % 12, a = s * Math.min(l, 1 - l);
+    const f = (n) => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+    const x = (v) => Math.round(255 * v).toString(16).padStart(2, '0');
+    return '#' + x(f(0)) + x(f(8)) + x(f(4));
+  }
+  function hexToRgb(hex) {
+    return [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)];
+  }
+  function colorDistance(a, b) {
+    const x = hexToRgb(a), y = hexToRgb(b);
+    return Math.hypot(x[0] - y[0], x[1] - y[1], x[2] - y[2]);
+  }
+  function rgbToHsl(hex) {
+    const [r, g, b] = hexToRgb(hex).map(v => v / 255);
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2;
+    let h = 0, s = 0;
+    if (mx !== mn) {
+      const d = mx - mn;
+      s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn);
+      if (mx === r) h = (g - b) / d + (g < b ? 6 : 0); else if (mx === g) h = (b - r) / d + 2; else h = (r - g) / d + 4;
+      h *= 60;
+    }
+    return { h: h, s: s, l: l };
+  }
+  // MAVİ tamamen yasak (denizle karışır): camgöbeği-mavi-lacivert tonları
+  function isBlueish(hex) {
+    const c = rgbToHsl(hex);
+    return c.h >= 175 && c.h <= 265 && c.s >= 0.2 && c.l > 0.08 && c.l < 0.95;
+  }
+  // 9 renk tonu (mavi aralığı çıkarıldı) x 3 parlaklık halkası + 3 nötr
+  const PALETTE = (function () {
+    const hues = [0, 30, 60, 90, 120, 150, 270, 300, 330];
+    const tones = [{ s: 80, l: 68 }, { s: 78, l: 50 }, { s: 70, l: 32 }];
+    const raw = [];
+    tones.forEach((t, ring) => hues.forEach((h, i) => raw.push({ hex: hslToHex(h, t.s, t.l), hue: h, ring: ring, slot: i })));
+    [['#ffffff', 0], ['#bdc3c7', 1], ['#8d6e63', 2]].forEach(n => raw.push({ hex: n[0], hue: -1, ring: 3, slot: n[1] }));
+    const out = [];
+    for (const c of raw) {
+      if (isBlueish(c.hex)) continue;
+      if (colorDistance(c.hex, SEA_COLOR) < 40 || colorDistance(c.hex, LAND_COLOR) < 40) continue;
+      if (out.some(o => colorDistance(o.hex, c.hex) < 45)) continue;
+      out.push(c);
+    }
+    return out.map((c, i) => ({ id: i, hex: c.hex, hue: c.hue, ring: c.ring, slot: c.slot }));
+  })();
+  const PALETTE_HEX = new Set(PALETTE.map(p => p.hex));
 
   /* --------------------------------------------------------------------- MAP */
   const MAP_DATA = [
@@ -706,9 +892,9 @@
     "0000000000000000000000001111111111111111111111111111111111111111111111111111111111111111111111000000",
     "0000000000000000000000000111111111111111111111111111111111111111111111111111111111111111111111100000",
     "0000000000000000000000000001111111111111111111111111111111111111111111111111111110011111111111110000",
-    "0000000000000000000000000001111111111111111111111111111111111111111111110011111000111111111111110000",
+    "00000000zx00000000000000000001111111111111111111111111111111111111111111110011111000111111111111110000",
     "0000000000000000000000000000111111111111111111111111111111111111111111100000100000111111111111110000",
-    "0000000000000000000000000000111111111111111111110111111111111111111111000001100000111111111111110000",
+    "0000000000000000000000000000111111111111111111110111111111111111111111000001110000111111111111110000",
     "0000000000000000000000000000111111111111111111100011111111111111111111000001111101111111111111110000",
     "0000000000000000000000000000111111111111111111100011111111111111111110000000110001111111111111111000",
     "0000000000000000000000000000111111111110001111110001111111111111111110000000000000011111111111111110",
@@ -717,7 +903,7 @@
     "0000000000000000011111111111111111100000010001111100000111111111111000000000000000000000001111111111",
     "0000000000000000001111111111111111000000011000111100000011111111111000000000000000000000000111111111",
     "0000000000000000011111111111111110000000011000011110000011111111111100000011111110000000000111111111",
-    "0000000000000000001111111111111000000000000000000111100011111110000001111111111111111000011111111111",
+    "0000000000000000001111111111111000000000000000000111100011111110010001111111111111111000011111111111",
     "0000000000000000011111111111110000000000011000000011110011111100000000111111111111111111111111111111",
     "0000000000000000011111111111100000000000011000000001010001110000001111111111111111111111111111111111",
     "0000000000000000011111111111100000000000010000000011000000111000001111111111111111111111111111111111",
@@ -728,7 +914,7 @@
     "0000000000000000000001100000000000000000000000000000000000000000000001100111111111111011111111111111",
     "0000000000000000000000000000000000000011111111000000000000000000000000000001111111100001111111111111",
     "0000000000000000000001100000000011111111111111100000000000000000000000000000000000000000111111111111",
-    "0000000000000000000111111111111111111111111111100000000000000000000000000000001110000000111111111111",
+    "0000000000000000000111111111111111111111111111100000000000000000000000000000011100000000111111111111",
     "0000000000000000001111111111111111111111111100000000000000000000000000000000111000000001111111111111",
     "0000000000000000011111111111111111111111111000000000000000000000000000000000000000000001111111111111",
     "0000000000000000111111111111111111111111111000000000000000000000000000000000000000000011111111111111",
@@ -755,6 +941,11 @@
     return h >>> 0;
   }
   const MAP_HASH = hash32(MAP_DATA.join('|'));
+  function gridHash(grid) { // sunucu-istemci durum senkronu doğrulaması
+    let h = 2166136261 >>> 0;
+    for (let i = 0; i < grid.length; i++) { h ^= (grid[i] & 0xffff); h = Math.imul(h, 16777619) >>> 0; }
+    return h >>> 0;
+  }
 
   function mulberry32(a) {
     return function () {
@@ -770,7 +961,6 @@
   function sanitizeName(s, max) {
     if (typeof s !== 'string') return '';
     s = s.normalize('NFC').replace(INVISIBLE, '');
-    // harf, rakam, boşluk, _ - .  (HTML/enjeksiyon karakterleri ayıklanır)
     s = s.replace(/[^\p{L}\p{N} _\-.]/gu, '').replace(/\s+/g, ' ').trim();
     return Array.from(s).slice(0, max).join('').trim();
   }
@@ -784,14 +974,16 @@
     c = c.trim().toLowerCase();
     return /^#[0-9a-f]{6}$/.test(c) ? c : null;
   }
-  function hexToRgb(hex) {
-    return [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)];
-  }
-  function colorDistance(a, b) {
-    const x = hexToRgb(a), y = hexToRgb(b);
-    return Math.hypot(x[0] - y[0], x[1] - y[1], x[2] - y[2]);
-  }
   function pairKey(a, b) { return a < b ? a + '-' + b : b + '-' + a; }
+  function cheb(a, b) {
+    return Math.max(Math.abs(((a / COLS) | 0) - ((b / COLS) | 0)), Math.abs((a % COLS) - (b % COLS)));
+  }
+
+  /* Genişleme hızı R (piksel/sn): S = oyuncunun toplam piksel sayısı */
+  function expansionRate(px, cfg) {
+    cfg = cfg || CONFIG;
+    return px < cfg.RATE_TIER1_MAX ? 1 : (px < cfg.RATE_TIER2_MAX ? 2 : 3);
+  }
 
   function rleEncode(arr) {
     const out = [];
@@ -822,35 +1014,39 @@
   }
 
   /* ------------------------------------------------ SAF YAKALAMA KONTROLÜ ----
-   * Hem sunucu (doğrulama) hem istemci (fare üstü vurgusu) aynı fonksiyonu kullanır.
-   * v = { grid, activeWar(a,b), pendingWar(a,b), isAlly(a,b) }
+   * Sunucu (doğrulama) ve istemci (fare üstü vurgusu) AYNI fonksiyonu kullanır.
+   * v = { grid, activeWar, pendingWar, isAlly, extraOwned?(idx) }
    * grid: -1 boş kara | 0 boş deniz | >0 sahibi olan hücre (denizde geçici işgal)  */
-  function adjacentOwned(grid, idx, pid) {
+  function anyNeighbor(idx, test) {
     const r = (idx / COLS) | 0, c = idx - r * COLS;
     for (let k = 0; k < 8; k++) {
       const nr = r + DIRS8[k][0], nc = c + DIRS8[k][1];
       if (nr < 0 || nr >= ROWS || nc < 0 || nc >= COLS) continue;
-      if (grid[nr * COLS + nc] === pid) return true;
+      if (test(nr * COLS + nc)) return true;
     }
     return false;
   }
+  function adjacentOwned(grid, idx, pid) { return anyNeighbor(idx, (n) => grid[n] === pid); }
   function captureCheck(v, pid, idx) {
     if (!Number.isInteger(idx) || idx < 0 || idx >= N) return { ok: false, code: 'bounds' };
     const cur = v.grid[idx];
     if (cur === pid) return { ok: false, code: 'own' };
     const land = LAND_MASK[idx] === 1;
-    if (land) {
-      if (cur > 0) {
-        if (!v.activeWar(pid, cur)) {
-          if (v.isAlly(pid, cur)) return { ok: false, code: 'ally' };
-          if (v.pendingWar(pid, cur)) return { ok: false, code: 'war_pending' };
-          return { ok: false, code: 'no_war' };
-        }
+    const naval = !!v.navalOpen;                                           // kurulumda ve ilk 5 sn: deniz kapalı
+    if (!land) {
+      if (!naval) return { ok: false, code: 'naval_locked' };
+      if (cur !== 0) return { ok: false, code: 'sea_taken' };
+    } else if (cur > 0) {
+      if (v.protectedNow) return { ok: false, code: 'protected' };         // savaş koruması: işgal yok
+      if (!v.activeWar(pid, cur)) {
+        if (v.isAlly(pid, cur)) return { ok: false, code: 'ally' };
+        if (v.pendingWar(pid, cur)) return { ok: false, code: 'war_pending' };
+        return { ok: false, code: 'no_war' };
       }
-    } else if (cur !== 0) {
-      return { ok: false, code: 'sea_taken' };
     }
-    if (!adjacentOwned(v.grid, idx, pid)) return { ok: false, code: 'not_adjacent' };
+    const ex = v.extraOwned;
+    // komşuluk: kara komşuluğu her zaman geçerli; deniz köprüsü (geçici deniz hücresi) yalnızca deniz açıkken
+    if (!anyNeighbor(idx, (n) => (v.grid[n] === pid || (ex && ex(n))) && (naval || LAND_MASK[n] === 1))) return { ok: false, code: 'not_adjacent' };
     return { ok: true, kind: land ? (cur === -1 ? 'free' : 'enemy') : 'sea', target: cur };
   }
 
@@ -860,10 +1056,13 @@
     ally: 'Müttefikinin topraklarına saldıramazsın.',
     not_adjacent: 'Sadece kendi sınırına komşu pikselleri alabilirsin.',
     sea_taken: 'Bu deniz hücresi başka bir ülke tarafından işgal edilmiş.',
-    no_actions: 'Bu tur için piksel hakkın bitti.',
-    turn_ended: 'Turu bitirdin; yeni turu bekle.',
+    no_points: 'Genişleme puanın bitti. Yeni zar için turu bekle.',
+    queue_full: 'Fetih kuyruğu dolu.',
+    cell_busy: 'Bu piksel şu an başka bir ülke tarafından fethediliyor.',
     pool_empty: 'Yerleştirecek pikselin kalmadı.',
-    bad_capital: 'Başkent için boş bir kara parçası seç.',
+    need_capital: 'Önce başkentini seç ve onayla.',
+    bad_capital: 'Başkent için uygun bir kara parçası seç.',
+    cap_locked: 'Savaş sürerken yeni başkent seçilemez; barış yapınca seçeceksin.',
     phase: 'Şu an bu işlem yapılamaz.',
     cooldown: 'Çok hızlı yazıyorsun.',
     bad_target: 'Geçersiz hedef.',
@@ -877,7 +1076,20 @@
     already_war: 'Bu ülkeyle zaten savaş halindesin.',
     ally_war: 'Müttefikine savaş açamazsın. Önce ittifakı boz.',
     not_allied: 'Bu ülkeyle müttefik değilsin.',
-    dead: 'Ülken yok edildi.'
+    lock: 'Antlaşma kilidi aktif.',
+    color_taken: 'Bu renk başka bir oyuncu tarafından seçildi.',
+    bad_color: 'Geçersiz renk (mavi tonları yasak).',
+    dead: 'Ülken yok edildi.',
+    no_sea: 'Denizaşırı toprak alınamaz: yalnızca kara sınırındaki pikselleri alabilirsin.',
+    naval_locked: 'Deniz hareketi kilitli: kurulumda kullanılamaz, oyun başladıktan 5 sn sonra açılır.',
+    protected: 'Savaş koruması: oyunun ilk turlarında işgal yapılamaz.',
+    war_protect: 'Savaş koruması: ilk turlarda savaş ilan edilemez.',
+    debt: 'Borcun var: borç ödenene kadar yeni genişleme kilitli (yeni zarla ödenir).',
+    gift_cd: 'Toprak transferi bekleme süresinde.',
+    gift_adj: 'Devir yalnızca alıcının topraklarına komşu sınır pikselleriyle yapılabilir.',
+    cap_gift: 'Başkent hiçbir diplomatik işlemle devredilemez.',
+    cap_debt: 'Borcun varken başkent taşınamaz.',
+    cap_same: 'Başkent zaten bu piksel.'
   };
 
   /* -------------------------------------------------------------------- GAME */
@@ -897,30 +1109,40 @@
       this.phase = 'LOBBY';
       this.timer = 0;
       this.round = 0;
-      this.roundElapsed = 0;
       this.countdown = null;
+      this.lobbyElapsed = 0;
+      this.nowMs = 0;
+      this.acc = 0;
+      this.matchId = '';
       this.wars = new Map();       // pairKey -> {a,b,declared,startRound,active}
       this.allies = new Set();     // pairKey
+      this.locks = new Map();      // pairKey -> {type:'peace'|'alliance'|'breakup', until}
       this.proposals = new Map();  // id -> {id,kind,from,to,exp}
       this.nextProposalId = 1;
+      this.pending = new Map();    // idx -> pid  (fethedilmekte olan şeritli pikseller)
+      this.seaExpiries = new Map(); // idx -> mutlak deterministik bitiş zamanı (ms)
+      this.navalUnlockAt = Infinity; // deniz hareketinin açılacağı oyun saati (kurulum boyunca kapalı)
       this.out = [];
       this.tickCount = 0;
       this.winners = null;
+      this.rank = null;
       this.overTimer = 0;
       this.pendingGifts = new Map();
+      this.suspects = new Set();
     }
 
     /* ---------- çıkış kuyruğu (taşıyıcıdan bağımsız) ---------- */
     emit(msg, to) { this.out.push({ to: to === undefined ? 'all' : to, msg: msg }); }
     drain() { const o = this.out; this.out = []; return o; }
-    news(text, kind, to) { this.emit({ t: 'news', text: text, kind: kind || 'info', round: this.round }, to); }
+    news(text, kind, who) { this.emit({ t: 'news', text: text, kind: kind || 'info', who: who || [] }); }
     notice(pid, text, kind) { this.emit({ t: 'notice', text: text, kind: kind || 'info' }, pid); }
     reject(pid, code, text) {
       const p = this.players.get(pid);
       if (!p) return;
+      p.rej10++;
       const last = p.lastReject[code];
-      if (last !== undefined && this.tickCount - last < 2) return; // spam kontrolü
-      p.lastReject[code] = this.tickCount;
+      if (last !== undefined && this.nowMs - last < 1500) return; // spam kontrolü
+      p.lastReject[code] = this.nowMs;
       this.emit({ t: 'reject', code: code, text: text || REJECT_TEXT[code] || 'Reddedildi.' }, pid);
     }
 
@@ -929,31 +1151,47 @@
       return {
         proto: PROTOCOL, mapHash: MAP_HASH, rows: ROWS, cols: COLS,
         MIN_PLAYERS: c.MIN_PLAYERS, MAX_PLAYERS: c.MAX_PLAYERS, LOBBY_COUNTDOWN: c.LOBBY_COUNTDOWN,
-        SETUP_SECONDS: c.SETUP_SECONDS, ROUND_SECONDS: c.ROUND_SECONDS, START_POOL: c.START_POOL,
-        MAX_ACTIONS: c.MAX_ACTIONS, MAX_CELLS_PER_MESSAGE: c.MAX_CELLS_PER_MESSAGE, NAME_MAX: c.NAME_MAX,
-        CHAT_MAX: c.CHAT_MAX, WAR_DELAY_ROUNDS: c.WAR_DELAY_ROUNDS, SETUP_FREE_PLACEMENT: c.SETUP_FREE_PLACEMENT
+        LOBBY_WAIT_SECONDS: c.LOBBY_WAIT_SECONDS, SETUP_SECONDS: c.SETUP_SECONDS, ROUND_SECONDS: c.ROUND_SECONDS,
+        START_POOL: c.START_POOL, MAX_CELLS_PER_MESSAGE: c.MAX_CELLS_PER_MESSAGE, NAME_MAX: c.NAME_MAX,
+        CHAT_MAX: c.CHAT_MAX, CHAT_COOLDOWN_MS: c.CHAT_COOLDOWN_MS, DM_COOLDOWN_MS: c.DM_COOLDOWN_MS,
+        WAR_DELAY_ROUNDS: c.WAR_DELAY_ROUNDS, PACT_LOCK_ROUNDS: c.PACT_LOCK_ROUNDS, MAX_QUEUE: c.MAX_QUEUE,
+        SETUP_FREE_PLACEMENT: c.SETUP_FREE_PLACEMENT, WAR_PROTECTION_ROUNDS: c.WAR_PROTECTION_ROUNDS, FLAG_PENALTY: c.FLAG_PENALTY,
+        DEBT_FLOOR: c.DEBT_FLOOR, GIFT_MAX_CELLS: c.GIFT_MAX_CELLS, GIFT_COOLDOWN_ROUNDS: c.GIFT_COOLDOWN_ROUNDS
+      };
+    }
+    info() {
+      return {
+        phase: this.phase, players: this.players.size, max: this.cfg.MAX_PLAYERS, humans: this.humanCount(),
+        bots: this.players.size - this.humanCount(), countdown: this.countdown,
+        wait: this.phase === 'LOBBY' ? Math.max(0, this.cfg.LOBBY_WAIT_SECONDS - this.lobbyElapsed) : 0, round: this.round
       };
     }
 
     /* ---------- oyuncular ---------- */
-    takenColors() { return Array.from(this.players.values()).map(p => p.color); }
+    colorTaken(hex, exceptPid) {
+      for (const p of this.players.values()) if (p.id !== exceptPid && p.color === hex) return true;
+      return false;
+    }
+    freePaletteColors() {
+      return PALETTE.filter(c => !this.colorTaken(c.hex, 0));
+    }
+    pickFreeColor() {
+      const free = this.freePaletteColors();
+      return free.length ? free[Math.floor(this.rng() * free.length)].hex : null;
+    }
 
     addPlayer(info, isBot) {
+      info = info || {};
       if (this.phase !== 'LOBBY') return { ok: false, code: 'in_progress', text: 'Oyun zaten başladı.' };
-      if (this.players.size >= this.cfg.MAX_PLAYERS) return { ok: false, code: 'full', text: 'Lobi dolu.' };
-      const color = normalizeColor(info && info.color);
-      if (!color) return { ok: false, code: 'bad_color', text: 'Geçersiz renk.' };
-      if (colorDistance(color, SEA_COLOR) < this.cfg.COLOR_RESERVED_DISTANCE ||
-          colorDistance(color, LAND_COLOR) < this.cfg.COLOR_RESERVED_DISTANCE) {
-        return { ok: false, code: 'color_reserved', text: 'Bu renk deniz/kara rengine çok benziyor.' };
-      }
-      for (const p of this.players.values()) {
-        if (colorDistance(color, p.color) < this.cfg.COLOR_MIN_DISTANCE) {
-          return { ok: false, code: 'color_taken', text: 'Bu renk (veya çok benzeri) alınmış.', taken: this.takenColors() };
-        }
+      if (this.players.size >= this.cfg.MAX_PLAYERS) return { ok: false, code: 'full', text: 'Sunucu dolu.' };
+      let color = null;
+      if (info.color !== undefined && info.color !== null) {
+        color = normalizeColor(info.color);
+        if (!color || !PALETTE_HEX.has(color)) return { ok: false, code: 'bad_color', text: REJECT_TEXT.bad_color };
+        if (this.colorTaken(color, 0)) return { ok: false, code: 'color_taken', text: REJECT_TEXT.color_taken };
       }
       const id = this.nextId++;
-      let name = sanitizeName(info && info.name, this.cfg.NAME_MAX) || ('ÜLKE ' + id);
+      let name = sanitizeName(info.name, this.cfg.NAME_MAX) || ('ÜLKE ' + id);
       const lower = new Set(Array.from(this.players.values()).map(p => p.name.toLowerCase()));
       if (lower.has(name.toLowerCase())) {
         let k = 2, cand;
@@ -962,9 +1200,10 @@
         name = cand;
       }
       const p = {
-        id: id, name: name, color: color, isBot: !!isBot, connected: true, alive: true,
-        token: isBot ? '' : this.genToken(), pool: 0, px: 0, capital: -1, dice: [0, 0], actions: 0,
-        ended: false, botDue: 0, lastChat: -99, lastDm: -99, lastReject: {}
+        id: id, name: name, color: color, flag: validateFlag(info.flag), isBot: !!isBot, connected: true, alive: true,
+        token: isBot ? '' : this.genToken(), pool: 0, px: 0, capital: -1, needCapital: false, capDue: 0,
+        points: 0, dice: [0, 0], queue: [], queued: new Set(), siege: false, lost: {},
+        botDue: 0, lastChat: -1e9, lastDm: -1e9, lastReject: {}, rej10: 0, giftUntil: 0
       };
       this.players.set(id, p);
       this.afterRosterChange();
@@ -972,24 +1211,31 @@
     }
 
     addBot() {
-      let color = null;
-      for (const n of NATIONS) {
-        if (this.players.size >= this.cfg.MAX_PLAYERS) break;
-        const taken = Array.from(this.players.values()).some(p => colorDistance(n.color, p.color) < this.cfg.COLOR_MIN_DISTANCE);
-        if (!taken) { color = n.color; break; }
-      }
-      for (let tries = 0; !color && tries < 200; tries++) {
-        const c = '#' + [0, 0, 0].map(() => Math.floor(this.rng() * 256).toString(16).padStart(2, '0')).join('');
-        const ok = colorDistance(c, SEA_COLOR) >= this.cfg.COLOR_RESERVED_DISTANCE &&
-          colorDistance(c, LAND_COLOR) >= this.cfg.COLOR_RESERVED_DISTANCE &&
-          !Array.from(this.players.values()).some(p => colorDistance(c, p.color) < this.cfg.COLOR_MIN_DISTANCE);
-        if (ok) color = c;
-      }
+      const color = this.pickFreeColor();
       if (!color) return { ok: false, code: 'full' };
       const used = new Set(Array.from(this.players.values()).map(p => p.name));
       const free = BOT_NAMES.filter(n => !used.has(n));
       const name = free.length ? free[Math.floor(this.rng() * free.length)] : 'BOT ' + this.nextId;
       return this.addPlayer({ name: name, color: color }, true);
+    }
+    fillBots(target) {
+      while (this.players.size < Math.min(target, this.cfg.MAX_PLAYERS)) {
+        if (!this.addBot().ok) break;
+      }
+    }
+
+    setColor(pid, hex) {
+      const p = this.players.get(pid);
+      if (!p) return;
+      if (this.phase !== 'LOBBY') return this.reject(pid, 'phase', 'Renk sadece lobide seçilebilir.');
+      const c = normalizeColor(hex);
+      if (!c || !PALETTE_HEX.has(c) || isBlueish(c)) return this.reject(pid, 'bad_color');
+      if (this.colorTaken(c, pid)) { this.reject(pid, 'color_taken'); return this.emitSnapshot(pid); }
+      p.color = c;
+      this.emitSnapshots();
+    }
+    autoAssignColors() {
+      for (const p of this.players.values()) if (!p.color) p.color = this.pickFreeColor() || PALETTE[0].hex;
     }
 
     removePlayer(pid) {
@@ -1020,45 +1266,82 @@
     }
 
     /* ---------- ilişkiler ---------- */
+    navalOpen() { return this.phase === 'PLAYING' && this.nowMs >= this.navalUnlockAt; }
+    navalLeftMs() { return (this.phase === 'PLAYING' && isFinite(this.navalUnlockAt)) ? Math.max(0, Math.round(this.navalUnlockAt - this.nowMs)) : -1; }
+    inProtection() { return this.phase === 'PLAYING' && this.round <= this.cfg.WAR_PROTECTION_ROUNDS; }
     isAlly(a, b) { return this.allies.has(pairKey(a, b)); }
     activeWar(a, b) { const w = this.wars.get(pairKey(a, b)); return !!(w && w.active); }
     pendingWar(a, b) { const w = this.wars.get(pairKey(a, b)); return !!(w && !w.active); }
-    view() {
-      return { grid: this.grid, activeWar: (a, b) => this.activeWar(a, b), pendingWar: (a, b) => this.pendingWar(a, b), isAlly: (a, b) => this.isAlly(a, b) };
+    hasActiveWar(pid) { for (const w of this.wars.values()) if (w.active && (w.a === pid || w.b === pid)) return true; return false; }
+    activeFronts(pid) {
+      const out = [];
+      for (const w of this.wars.values()) if (w.active && (w.a === pid || w.b === pid)) out.push(w.a === pid ? w.b : w.a);
+      return out;
+    }
+    lockOf(a, b) {
+      const l = this.locks.get(pairKey(a, b));
+      return (l && l.until > this.round) ? l : null;
+    }
+    view(p) {
+      return {
+        grid: this.grid, activeWar: (a, b) => this.activeWar(a, b), pendingWar: (a, b) => this.pendingWar(a, b),
+        isAlly: (a, b) => this.isAlly(a, b), extraOwned: p ? (i) => p.queued.has(i) : null,
+        protectedNow: this.inProtection(),
+        navalOpen: this.navalOpen()
+      };
     }
 
-    /* ---------- tick ---------- */
+    /* ---------- zaman: advance(ms) -> pump (fetih ilerlemesi) + her 1000 ms'de tick ---------- */
+    advance(ms) {
+      if (!Number.isFinite(ms) || ms <= 0) return;
+      this.nowMs += ms;
+      this.pump(ms);
+      this.expireSeaCells();
+      this.acc += ms;
+      while (this.acc >= 1000) { this.acc -= 1000; this.tick(); }
+    }
+
     tick() {
       this.tickCount++;
       if (this.phase === 'LOBBY') this.tickLobby();
       else if (this.phase === 'SETUP') this.tickSetup();
       else if (this.phase === 'PLAYING') this.tickPlaying();
       else if (this.phase === 'ENDED') { if (this.overTimer > 0) this.overTimer--; }
+      if (this.tickCount % 10 === 0) {
+        for (const p of this.players.values()) { if (p.rej10 > this.cfg.REJECT_FLOOD) this.suspects.add(p.id); p.rej10 = 0; }
+      }
       this.flushGifts();
       this.emitTick();
     }
 
     tickLobby() {
+      if (this.players.size > 0) this.lobbyElapsed++;
       if (this.players.size >= this.cfg.MIN_PLAYERS) {
         if (this.countdown === null) this.countdown = this.cfg.LOBBY_COUNTDOWN;
         else this.countdown--;
         if (this.countdown <= 0) this.startSetup();
       } else {
         this.countdown = null;
+        if (this.lobbyElapsed >= this.cfg.LOBBY_WAIT_SECONDS && this.humanCount() > 0) {
+          this.fillBots(this.cfg.BOT_FILL_TO);   // 60 sn içinde 10'a ulaşılamadı: botlarla doldur, hemen başlat
+          this.startSetup();
+        }
       }
     }
 
     startSetup() {
+      this.autoAssignColors();
       this.phase = 'SETUP';
       this.countdown = null;
       this.timer = this.cfg.SETUP_SECONDS;
       this.grid = freshGrid();
+      this.matchId = 'm' + this.nextId + '-' + Math.floor(this.rng() * 0xffffffff).toString(36);
       for (const p of this.players.values()) {
-        p.pool = this.cfg.START_POOL; p.px = 0; p.capital = -1; p.alive = true; p.ended = false;
-        p.actions = 0; p.dice = [0, 0];
+        p.pool = this.cfg.START_POOL; p.px = 0; p.capital = -1; p.alive = true; p.points = 0; p.dice = [0, 0];
+        p.queue = []; p.queued = new Set(); p.needCapital = false; p.capDue = 0; p.siege = false; p.lost = {}; p.giftUntil = 0;
         p.botDue = 1 + Math.floor(this.rng() * Math.max(1, Math.min(8, this.cfg.SETUP_SECONDS - 2)));
       }
-      this.news('Savaş başladı! Başkentini seç ve ' + this.cfg.START_POOL + ' pikselini haritaya yerleştir.', 'info');
+      this.news('Savaş başladı! Başkentini seç, onayla ve ' + this.cfg.START_POOL + ' pikselini yerleştir.', 'info');
       this.emitSnapshots();
     }
 
@@ -1070,16 +1353,19 @@
       if (this.timer <= 0) { this.finishSetup(); this.startRound(1); }
     }
 
-    // süre bitince eksik kalanları otomatik tamamla (başkent seçmeyen / piksel kalan)
+    // süre bitince eksikleri otomatik tamamla
     finishSetup() {
       for (const p of this.players.values()) {
         if (!p.alive) continue;
         if (p.capital < 0) {
-          const idx = this.pickRandomFreeLand();
-          if (idx >= 0) this.applySetupCell(p, idx);
+          // sahip olunan kara pikseli varsa onlardan rastgele; yoksa rastgele boş kara
+          const owned = []; for (let i = 0; i < N; i++) if (this.grid[i] === p.id && LAND_MASK[i]) owned.push(i);
+          if (owned.length) { p.capital = owned[Math.floor(this.rng() * owned.length)]; }
+          else { const idx = this.pickRandomFreeLand(); if (idx >= 0) this.applySetupCell(p, idx); }
+          this.notice(p.id, 'Başkent seçmediğin için rastgele atandı.', 'warn');
         }
         if (p.pool > 0) {
-          const cells = this.growShape(p, p.pool, true);
+          const cells = this.growShape(p, p.pool, false);
           for (const idx of cells) if (p.pool > 0) this.applySetupCell(p, idx);
         }
       }
@@ -1098,18 +1384,11 @@
       this.emit({ t: 'cells', c: [[idx, p.id]] });
     }
 
-    // p'nin mevcut toprağından başlayarak rastgele büyüyen 'count' hücrelik şekil (boş karalar)
     growShape(p, count, fallbackAnywhere) {
       const chosen = [], set = new Set(), cand = new Set();
       const g = this.grid;
       const consider = (i) => { if (LAND_MASK[i] && g[i] === -1 && !set.has(i)) cand.add(i); };
-      const neighbors = (i, fn) => {
-        const r = (i / COLS) | 0, c = i - r * COLS;
-        for (let k = 0; k < 8; k++) {
-          const nr = r + DIRS8[k][0], nc = c + DIRS8[k][1];
-          if (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS) fn(nr * COLS + nc);
-        }
-      };
+      const neighbors = (i, fn) => anyNeighbor(i, (n) => { fn(n); return false; });
       for (let i = 0; i < N; i++) if (g[i] === p.id) neighbors(i, consider);
       while (chosen.length < count) {
         if (cand.size === 0) {
@@ -1129,58 +1408,57 @@
       return chosen;
     }
 
-    /* ---------- tur ---------- */
+    /* ---------- tur (30 sn): zar -> genişleme puanı ---------- */
     startRound(n) {
       this.phase = 'PLAYING';
+      if (n === 1) { this.navalUnlockAt = this.nowMs + this.cfg.NAVAL_UNLOCK_MS; this.seaExpiries.clear(); }   // oyun başladı: 5 sn sonra deniz açılır
       this.round = n;
       this.timer = this.cfg.ROUND_SECONDS;
-      this.roundElapsed = 0;
       for (const w of this.wars.values()) {
         if (!w.active && w.startRound <= n) {
           w.active = true;
           const a = this.players.get(w.a), b = this.players.get(w.b);
-          if (a && b) this.news('⚔ ' + a.name + ' ile ' + b.name + ' arasında SAVAŞ BAŞLADI! Piksel cephesi aktif.', 'war');
+          if (a && b) this.news('⚔ ' + a.name + ' ile ' + b.name + ' arasında SAVAŞ BAŞLADI! Piksel cephesi aktif.', 'war', [w.a, w.b]);
         }
       }
       for (const [id, pr] of Array.from(this.proposals)) if (pr.exp < n) this.proposals.delete(id);
+      for (const [k, l] of Array.from(this.locks)) if (l.until <= n) this.locks.delete(k);
       for (let i = 0; i < N; i++) if (!LAND_MASK[i] && this.grid[i] > 0) this.grid[i] = 0; // geçici deniz işgalleri
       for (const p of this.players.values()) {
-        p.ended = false;
-        if (!p.alive) { p.actions = 0; p.dice = [0, 0]; continue; }
+        if (!p.alive) { p.dice = [0, 0]; continue; }
+        // kuşatma bedeli (tur sonu): bakiye 0 ise kesinti atlanır, negatife düşmez
+        if (p.siege) {
+          p.siege = false;
+          if (p.points > 0) {
+            const cut = Math.min(p.points, this.cfg.SIEGE_LOSS);
+            p.points -= cut;
+            this.notice(p.id, '🏰 Başkent kuşatma altında: −' + cut + ' puan.', 'war');
+          }
+        }
         const d1 = 1 + Math.floor(this.rng() * 6), d2 = 1 + Math.floor(this.rng() * 6);
         p.dice = [d1, d2];
-        p.actions = Math.min(this.cfg.MAX_ACTIONS, d1 * d2);
-        p.botDue = 1 + Math.floor(this.rng() * Math.max(1, Math.min(10, this.cfg.ROUND_SECONDS - 3)));
+        p.points = Math.min(this.cfg.MAX_POINTS, p.points + Math.min(this.cfg.MAX_DICE_POINTS, d1 * d2));
+        p.botDue = 1 + Math.floor(this.rng() * Math.max(1, Math.min(8, this.cfg.ROUND_SECONDS - 3)));
+        this.maybePromptCapital(p);
       }
-      this.news('— TUR ' + n + ' başladı —', 'info');
       this.emitSnapshots();
       this.emitDiploAll();
     }
 
     tickPlaying() {
-      this.timer--; this.roundElapsed++;
-      for (const p of this.players.values()) {
-        if (p.isBot && p.alive && !p.ended && --p.botDue <= 0) this.botAct(p);
-      }
-      if (this.phase !== 'PLAYING') return;
-      const ready = this.roundElapsed >= this.cfg.MIN_ROUND_SECONDS && this.allReady();
-      if (this.timer <= 0 || ready) this.nextRound();
-    }
-
-    allReady() {
+      this.timer--;
       for (const p of this.players.values()) {
         if (!p.alive) continue;
-        if (!p.isBot && !p.connected) continue;
-        if (!p.ended) return false;
+        if (p.capDue > 0 && --p.capDue === 0) this.autoCapital(p);
+        if (p.isBot && p.botDue > 0 && --p.botDue === 0) this.botAct(p);
       }
-      return true;
+      if (this.phase !== 'PLAYING') return;
+      if (this.timer <= 0) this.nextRound();
     }
 
     nextRound() {
       if (this.round >= this.cfg.MAX_ROUNDS) {
-        const alive = this.aliveList().sort((a, b) => b.px - a.px);
-        const top = alive.length ? alive[0].px : 0;
-        this.endGame(alive.filter(p => p.px === top).map(p => p.id), 'Tur sınırı doldu — en çok piksele sahip ülke kazandı.');
+        this.endGame(null, 'Tur sınırı doldu — en çok piksele sahip ülke kazandı.');
         return;
       }
       this.startRound(this.round + 1);
@@ -1199,14 +1477,73 @@
       this.endGame(alive.map(p => p.id), 'Kalan tüm ülkeler müttefik — ortak zafer!');
     }
 
+    // sıralama: toplam piksel. İlk 5'e Savaş Deneyimi (50/40/30/20/10)
+    computeRank() {
+      const list = Array.from(this.players.values()).sort((a, b) => (b.px - a.px) || (a.id - b.id));
+      return list.map((p, i) => ({ id: p.id, px: p.px, exp: i < this.cfg.EXP_REWARDS.length ? this.cfg.EXP_REWARDS[i] : 0 }));
+    }
+
     endGame(winnerIds, reason) {
+      this.rank = this.computeRank();
+      if (!winnerIds) {
+        const top = this.rank.length ? this.rank[0].px : 0;
+        winnerIds = this.rank.filter(r => r.px === top).map(r => r.id);
+      }
       this.phase = 'ENDED';
       this.winners = winnerIds.slice();
       this.overTimer = this.cfg.GAME_OVER_SECONDS;
+      for (const p of this.players.values()) { p.queue = []; p.queued = new Set(); }
+      this.pending.clear();
       const names = winnerIds.map(id => (this.players.get(id) || {}).name).filter(Boolean).join(', ');
-      this.news('🏆 OYUN BİTTİ! Kazanan: ' + (names || '—') + '. ' + reason, 'info');
-      this.emit({ t: 'over', winners: this.winners, reason: reason });
+      this.news('🏆 OYUN BİTTİ! Kazanan: ' + (names || '—') + '. ' + reason, 'info', winnerIds.slice(0, 2));
+      this.emit({ t: 'over', winners: this.winners, reason: reason, rank: this.rank, match: this.matchId });
       this.emitTick();
+    }
+
+    /* ---------- başkent ---------- */
+    chooseCapital(pid, idx) {
+      const p = this.players.get(pid);
+      if (!p) return;
+      if (!p.alive) return this.reject(pid, 'dead');
+      if (!Number.isInteger(idx) || idx < 0 || idx >= N) return this.reject(pid, 'bad_capital');
+      if (this.phase === 'SETUP') {
+        if (p.capital >= 0) return;
+        if (!LAND_MASK[idx] || this.grid[idx] !== -1) return this.reject(pid, 'bad_capital');
+        this.grid[idx] = pid; p.capital = idx; p.pool--; p.px++;
+        this.emit({ t: 'cells', c: [[idx, pid]] });
+        this.notice(pid, 'Başkent kuruldu! Kalan piksellerini yerleştir.', 'ok');
+        this.emitYou(pid);
+      } else if (this.phase === 'PLAYING') {
+        if (p.needCapital) {                    // kaybedilen başkent yerine yenisi (ceza kayıp anında düşüldü)
+          if (p.capDue <= 0) return this.reject(pid, 'cap_locked');
+          if (!LAND_MASK[idx] || this.grid[idx] !== pid) return this.reject(pid, 'bad_capital');
+          this.setCapital(p, idx);
+        } else {                                // MANUEL bayrak relokasyonu: -2 puan
+          if (!LAND_MASK[idx] || this.grid[idx] !== pid) return this.reject(pid, 'bad_capital');
+          if (idx === p.capital) return this.reject(pid, 'cap_same');
+          if (this.hasActiveWar(pid)) return this.reject(pid, 'cap_locked');
+          if (p.points < 0) return this.reject(pid, 'cap_debt');
+          p.capital = idx;
+          this.flagPenalty(p, '🚩 Bayrak manuel taşındı');
+        }
+      } else this.reject(pid, 'phase');
+    }
+    setCapital(p, idx) {
+      p.capital = idx; p.needCapital = false; p.capDue = 0;
+      this.notice(p.id, '🏛 Yeni başkent belirlendi.', 'ok');
+      this.emitYou(p.id);
+    }
+    autoCapital(p) {
+      const owned = []; for (let i = 0; i < N; i++) if (this.grid[i] === p.id && LAND_MASK[i]) owned.push(i);
+      if (!owned.length) return;
+      this.setCapital(p, owned[Math.floor(this.rng() * owned.length)]);
+      this.notice(p.id, 'Süre doldu; başkent rastgele atandı.', 'warn');
+    }
+    maybePromptCapital(p) {
+      if (!p.alive || !p.needCapital || p.capDue > 0 || this.hasActiveWar(p.id)) return;
+      p.capDue = this.cfg.CAPITAL_RELOC_SECONDS;
+      this.emit({ t: 'capital_prompt', secs: p.capDue }, p.id);
+      this.emitYou(p.id);
     }
 
     /* ---------- piksel işlemleri ---------- */
@@ -1225,55 +1562,190 @@
       if (!p.alive) return this.reject(pid, 'dead');
       idxs = this.ints(idxs);
       if (!idxs.length) return;
-      const changes = [];
-      let youDirty = false;
-      if (this.phase === 'SETUP') {
-        for (const idx of idxs) {
-          if (p.capital < 0) {
-            if (LAND_MASK[idx] && this.grid[idx] === -1) {
-              this.grid[idx] = pid; p.capital = idx; p.pool--; p.px++;
-              changes.push([idx, pid]); youDirty = true;
-              this.notice(pid, 'Başkent kuruldu! Kalan piksellerini yerleştir.', 'ok');
-            } else this.reject(pid, 'bad_capital');
-            continue;
-          }
-          if (p.pool <= 0) { this.reject(pid, 'pool_empty'); break; }
-          if (!LAND_MASK[idx] || this.grid[idx] !== -1) continue;
-          if (!this.cfg.SETUP_FREE_PLACEMENT && !adjacentOwned(this.grid, idx, pid)) { this.reject(pid, 'not_adjacent'); continue; }
-          this.grid[idx] = pid; p.pool--; p.px++;
-          changes.push([idx, pid]); youDirty = true;
-        }
-      } else if (this.phase === 'PLAYING') {
-        if (p.ended) return this.reject(pid, 'turn_ended');
-        for (const idx of idxs) {
-          if (p.actions <= 0) { this.reject(pid, 'no_actions'); break; }
-          const res = captureCheck(this.view(), pid, idx);
-          if (!res.ok) { if (res.code !== 'own' && res.code !== 'bounds') this.reject(pid, res.code); continue; }
-          const prevOwner = res.kind === 'enemy' ? this.players.get(res.target) : null;
-          this.grid[idx] = pid;
-          if (res.kind !== 'sea') p.px++;
-          if (prevOwner) prevOwner.px--;
-          p.actions--; youDirty = true;
-          changes.push([idx, pid]);
-          if (prevOwner && prevOwner.px <= 0 && prevOwner.alive) this.eliminate(prevOwner, p, changes);
-        }
-      } else {
-        return this.reject(pid, 'phase');
+      if (this.phase === 'SETUP') return this.paintSetup(p, idxs);
+      if (this.phase !== 'PLAYING') return this.reject(pid, 'phase');
+      const added = [];
+      for (const idx of idxs) {
+        if (p.queued.has(idx)) continue;
+        if (p.queue.length >= this.cfg.MAX_QUEUE) { this.reject(pid, 'queue_full'); break; }
+        if (p.points <= 0) { this.reject(pid, p.points < 0 ? 'debt' : 'no_points'); break; }
+        const other = this.pending.get(idx);
+        if (other !== undefined && other !== pid) { this.reject(pid, 'cell_busy'); continue; }
+        const res = captureCheck(this.view(p), pid, idx);
+        if (!res.ok) { if (res.code !== 'own' && res.code !== 'bounds') this.reject(pid, res.code); continue; }
+        const ms = res.kind === 'enemy' ? this.cfg.CAPTURE_MS_ENEMY : (res.kind === 'sea' ? this.cfg.CAPTURE_MS_SEA : this.cfg.CAPTURE_MS_FREE);
+        p.points--;
+        p.queue.push({ idx: idx, kind: res.kind, ms: ms, left: ms, base: ms, started: false });
+        p.queued.add(idx);
+        this.pending.set(idx, pid);
+        added.push(idx);
       }
-      if (changes.length) this.emit({ t: 'cells', c: changes });
-      if (youDirty) this.emitYou(pid);
+      if (added.length) {
+        this.emit({ t: 'capq', pid: pid, c: added });
+        this.emitYou(pid);
+      }
+    }
+
+    paintSetup(p, idxs) {
+      if (p.capital < 0) return this.reject(p.id, 'need_capital');
+      const changes = [];
+      for (const idx of idxs) {
+        if (p.pool <= 0) { this.reject(p.id, 'pool_empty'); break; }
+        if (!LAND_MASK[idx] || this.grid[idx] !== -1) continue;
+        if (!this.cfg.SETUP_FREE_PLACEMENT && !adjacentOwned(this.grid, idx, p.id)) { this.reject(p.id, 'not_adjacent'); continue; }
+        this.grid[idx] = p.id; p.pool--; p.px++;
+        changes.push([idx, p.id]);
+      }
+      if (changes.length) { this.emit({ t: 'cells', c: changes }); this.emitYou(p.id); }
+    }
+
+    /* Süresi dolan geçici deniz köprülerini deterministik oyun saatine göre kaldır. */
+    expireSeaCells() {
+      if (!this.seaExpiries.size) return;
+      const expired = [];
+      for (const [idx, expiresAt] of this.seaExpiries) {
+        if (expiresAt <= this.nowMs && !LAND_MASK[idx] && this.grid[idx] > 0) {
+          this.grid[idx] = 0;
+          expired.push([idx, 0]);
+        }
+        if (expiresAt <= this.nowMs) this.seaExpiries.delete(idx);
+      }
+      if (expired.length) this.emit({ t: 'cells', c: expired });
+    }
+
+    /* zamanlı fetih: oyuncu kuyruğunda yalnızca ilk hücre çalışır; sonraki hücre öncekinin
+       tamamlanmasından sonra başlar. Büyük zaman adımlarında dahi sıralama korunur. */
+    pump(ms) {
+      if (this.phase !== 'PLAYING' || ms <= 0) return;
+      for (const p of this.players.values()) {
+        if (!p.alive || !p.queue.length) continue;
+        let budget = ms;
+        while (budget > 0 && p.queue.length) {
+          const h = p.queue[0];
+          if (!h.started) {
+            h.started = true;
+            // dinamik hız: hücre süresi = taban süre / R  (R, S = toplam piksele göre)
+            h.ms = Math.max(1, Math.round((h.base || h.ms) / expansionRate(p.px, this.cfg)));
+            h.left = h.ms;
+            this.emit({ t: 'capstart', pid: p.id, idx: h.idx, ms: h.ms });
+          }
+          if (h.left > budget) { h.left -= budget; budget = 0; break; }
+          budget -= h.left; h.left = 0;
+          p.queue.shift(); p.queued.delete(h.idx); this.pending.delete(h.idx);
+          this.finishCapture(p, h);
+          if (this.phase !== 'PLAYING') return;
+        }
+      }
+    }
+
+    finishCapture(p, h) {
+      if (!p.alive) return;
+      const res = captureCheck(this.view(null), p.id, h.idx);
+      if (!res.ok) { // durum değişti (barış, komşuluk kaybı...): iptal + iade
+        p.points = Math.min(this.cfg.MAX_POINTS, p.points + 1);
+        this.emit({ t: 'capcancel', pid: p.id, c: [h.idx] });
+        this.emitYou(p.id);
+        return;
+      }
+      const changes = [[h.idx, p.id]];
+      this.grid[h.idx] = p.id;
+      if (res.kind === 'sea') this.seaExpiries.set(h.idx, this.nowMs + this.cfg.SEA_HOLD_MS);   // geçici: 5 sn sonra geri döner
+      else p.px++;
+      let victim = null;
+      if (res.kind === 'enemy') {
+        const d = this.players.get(res.target);
+        d.px--;
+        if (d.capital === h.idx) {
+          this.capitalLost(d, p);
+        } else if (d.capital >= 0 && cheb(h.idx, d.capital) <= this.cfg.SIEGE_RADIUS) {
+          d.siege = true; // başkent muharebe içinde
+        }
+        d.lost[p.id] = (d.lost[p.id] || 0) + 1;
+        if (d.lost[p.id] % this.cfg.ATTRITION_STEP === 0) this.attrition(d);
+        if (d.px <= 0 && d.alive) victim = d;
+      }
+      if (victim) this.eliminate(victim, p, changes);
+      if (p.alive && res.kind !== 'sea') this.enclose(p, changes);   // çevrelenen alanlar otomatik oyuncuya geçer
+      this.emit({ t: 'cells', c: changes });
       if (this.phase === 'PLAYING') this.checkEnd();
     }
 
+    /* BAYRAK (başkent) kaybı: başkent düşer + 2 puan ceza (bakiye -2'ye kadar düşebilir = borç) */
+    capitalLost(d, by) {
+      d.capital = -1; d.needCapital = true; d.capDue = 0;
+      this.notice(d.id, '🏛 BAŞKENT DÜŞTÜ! Savaş bitince (barış) yeni başkent seçeceksin.', 'war');
+      this.news('🏛 ' + d.name + ' ülkesinin başkenti ' + by.name + ' tarafından ele geçirildi!', 'war', [d.id, by.id]);
+      this.flagPenalty(d, '🚩 Bayrak konumu kaybedildi');
+    }
+    flagPenalty(p, why) {
+      if (!p.alive) return;
+      p.points = Math.max(this.cfg.DEBT_FLOOR, p.points - this.cfg.FLAG_PENALTY);
+      this.notice(p.id, why + ': −' + this.cfg.FLAG_PENALTY + ' puan' +
+        (p.points < 0 ? ' — BORÇ ' + p.points + ': borç ödenene kadar yeni genişleme kilitli.' : '.'), 'war');
+      this.emitYou(p.id);
+    }
+
+    /* ÇEVRELEME (flood-fill): haritanın dışından (4 yönlü) erişilemeyen, oyuncu dışı kara hücreleri
+       tamamen oyuncunun topraklarıyla çevrilidir -> sahipsiz ve (müttefik olmayan, korumadışı) rakip
+       parçaları otomatik oyuncuya geçer. Oyuncu toprağı 8 yönlü bitişik sayıldığı için dış akış 4 yönlüdür. */
+    enclose(p, changes) {
+      if (!p.alive || p.px <= 0 || this.phase !== 'PLAYING') return 0;
+      const g = this.grid, me = p.id, seen = new Uint8Array(N), stack = [];
+      const push = (i) => { if (!seen[i] && (g[i] !== me || !LAND_MASK[i])) { seen[i] = 1; stack.push(i); } };   // geçici deniz köprüsü duvar olmaz
+      for (let c = 0; c < COLS; c++) { push(c); push((ROWS - 1) * COLS + c); }
+      for (let r = 0; r < ROWS; r++) { push(r * COLS); push(r * COLS + COLS - 1); }
+      while (stack.length) {
+        const i = stack.pop(), r = (i / COLS) | 0, c = i - r * COLS;
+        if (r > 0) push(i - COLS);
+        if (r < ROWS - 1) push(i + COLS);
+        if (c > 0) push(i - 1);
+        if (c < COLS - 1) push(i + 1);
+      }
+      const prot = this.inProtection();
+      const victims = []; let gained = 0;
+      for (let i = 0; i < N; i++) {
+        if (seen[i] || !LAND_MASK[i] || g[i] === me) continue;
+        const o = g[i];
+        if (o === -1) { g[i] = me; p.px++; gained++; changes.push([i, me]); continue; }
+        const d = this.players.get(o);
+        if (!d || !d.alive || prot || this.isAlly(me, o)) continue;   // koruma süresi / müttefik: dokunulmaz
+        g[i] = me; p.px++; d.px--; gained++; changes.push([i, me]);
+        if (d.capital === i) this.capitalLost(d, p);
+        if (d.px <= 0 && victims.indexOf(d) < 0) victims.push(d);
+      }
+      for (const d of victims) if (d.alive) this.eliminate(d, p, changes);
+      if (gained) this.notice(p.id, '🧩 Çevrelenen ' + gained + ' piksel otomatik olarak topraklarına katıldı.', 'ok');
+      return gained;
+    }
+
+    // yıpranma zarı: her aktif cephe için ayrı %50. Tek cephe isabeti -2, çok cephede cephe başına -1
+    attrition(d) {
+      const fronts = this.activeFronts(d.id);
+      if (!fronts.length) return;
+      const per = fronts.length >= 2 ? this.cfg.ATTRITION_LOSS_MULTI : this.cfg.ATTRITION_LOSS_SINGLE;
+      let hits = 0;
+      for (let i = 0; i < fronts.length; i++) if (this.rng() < this.cfg.ATTRITION_CHANCE) hits++;
+      const want = hits * per;
+      if (want <= 0 || d.points <= 0) return;   // bakiye 0 ise kesinti atlanır
+      const cut = Math.min(d.points, want);
+      d.points -= cut;
+      this.notice(d.id, '🩸 Savaş yorgunluğu (' + fronts.length + ' cephe, ' + hits + ' isabet): −' + cut + ' puan.', 'war');
+      this.emitYou(d.id);
+    }
+
     eliminate(victim, by, changes) {
-      victim.alive = false; victim.ended = true; victim.actions = 0;
+      victim.alive = false; victim.points = 0; victim.needCapital = false; victim.capDue = 0;
+      for (const q of victim.queue) this.pending.delete(q.idx);
+      if (victim.queue.length) this.emit({ t: 'capcancel', pid: victim.id, c: victim.queue.map(q => q.idx) });
+      victim.queue = []; victim.queued = new Set();
       for (let i = 0; i < N; i++) {
         if (!LAND_MASK[i] && this.grid[i] === victim.id) { this.grid[i] = 0; changes.push([i, 0]); }
       }
       for (const [k, w] of Array.from(this.wars)) if (w.a === victim.id || w.b === victim.id) this.wars.delete(k);
       for (const k of Array.from(this.allies)) { const [a, b] = k.split('-').map(Number); if (a === victim.id || b === victim.id) this.allies.delete(k); }
       for (const [id, pr] of Array.from(this.proposals)) if (pr.from === victim.id || pr.to === victim.id) this.proposals.delete(id);
-      this.news('💀 ' + victim.name + ' YOK EDİLDİ! (' + by.name + ' son pikselini ele geçirdi)', 'war');
+      for (const q of this.players.values()) delete q.lost[victim.id];
+      this.news('💀 ' + victim.name + ' YOK EDİLDİ! (' + by.name + ' son pikselini ele geçirdi)', 'war', [victim.id, by.id]);
       this.emitDiploAll();
       this.emitYou(victim.id);
     }
@@ -1284,20 +1756,28 @@
       if (this.phase !== 'PLAYING') return this.reject(pid, 'phase');
       if (!p.alive) return this.reject(pid, 'dead');
       if (!t || !t.alive || to === pid) return this.reject(pid, 'bad_target');
-      if (!this.isAlly(pid, to)) return this.reject(pid, 'not_ally');
+      if (this.round < p.giftUntil) {
+        return this.reject(pid, 'gift_cd', '⏳ Toprak transferi bekleme süresinde: ' + (p.giftUntil - this.round) + ' tur sonra yeniden devredebilirsin.');
+      }
       idxs = this.ints(idxs);
-      const changes = []; let bad = false;
+      const changes = []; let reason = null;
       for (const idx of idxs) {
-        if (!LAND_MASK[idx] || this.grid[idx] !== pid || idx === p.capital || p.px <= 1) { bad = true; continue; }
+        if (changes.length >= this.cfg.GIFT_MAX_CELLS) break;          // tek seferde en fazla 3 piksel
+        if (idx === p.capital) { reason = 'cap_gift'; continue; }     // başkent asla devredilemez
+        if (!LAND_MASK[idx] || this.grid[idx] !== pid || p.px <= 1 || this.pending.has(idx)) { reason = reason || 'gift_bad'; continue; }
+        // alıcıda bağlantısız toprak oluşmasın: alıcının (veya bu devirde verilen) toprağına komşu olmalı
+        if (!anyNeighbor(idx, (n) => LAND_MASK[n] === 1 && this.grid[n] === to)) { reason = reason || 'gift_adj'; continue; }
         this.grid[idx] = to; p.px--; t.px++;
         changes.push([idx, to]);
       }
-      if (bad && !changes.length) this.reject(pid, 'gift_bad');
-      if (changes.length) {
-        this.emit({ t: 'cells', c: changes });
-        const k = pid + '>' + to;
-        this.pendingGifts.set(k, (this.pendingGifts.get(k) || 0) + changes.length);
-      }
+      if (!changes.length) { if (reason) this.reject(pid, reason); return; }
+      p.giftUntil = this.round + this.cfg.GIFT_COOLDOWN_ROUNDS;       // transfer cooldown: 5 tur
+      this.enclose(t, changes);
+      this.emit({ t: 'cells', c: changes });
+      const k = pid + '>' + to;
+      this.pendingGifts.set(k, (this.pendingGifts.get(k) || 0) + changes.length);
+      this.emitYou(pid);
+      this.checkEnd();
     }
     flushGifts() {
       if (!this.pendingGifts.size) return;
@@ -1307,18 +1787,9 @@
         if (!pa || !pb) continue;
         this.notice(b, '🎁 ' + pa.name + ' sana ' + n + ' piksel devretti!', 'ok');
         this.notice(a, '🎁 ' + pb.name + ' ülkesine ' + n + ' piksel devrettin.', 'ok');
-        this.news('🎁 ' + pa.name + ' → ' + pb.name + ': ' + n + ' piksel devredildi.', 'ally');
+        this.news('🎁 ' + pa.name + ' → ' + pb.name + ': ' + n + ' piksel devredildi.', 'ally', [a, b]);
       }
       this.pendingGifts.clear();
-    }
-
-    endTurn(pid) {
-      const p = this.players.get(pid);
-      if (!p || !p.alive) return;
-      if (this.phase !== 'PLAYING') return;
-      if (p.ended) return;
-      p.ended = true;
-      this.emitYou(pid);
     }
 
     /* ---------- diplomasi ---------- */
@@ -1326,6 +1797,12 @@
       for (const [id, pr] of Array.from(this.proposals)) {
         if ((pr.from === a && pr.to === b) || (pr.from === b && pr.to === a)) this.proposals.delete(id);
       }
+    }
+    setLock(a, b, type) { this.locks.set(pairKey(a, b), { type: type, until: this.round + this.cfg.PACT_LOCK_ROUNDS }); }
+    clearWarState(a, b) {
+      const pa = this.players.get(a), pb = this.players.get(b);
+      if (pa) delete pa.lost[b];
+      if (pb) delete pb.lost[a];
     }
 
     diploGuard(pid, to) {
@@ -1340,13 +1817,20 @@
     declareWar(pid, to) {
       const g = this.diploGuard(pid, to);
       if (!g) return;
+      if (this.inProtection()) {
+        return this.reject(pid, 'war_protect', '🛡 Savaş koruması: TUR ' + (this.cfg.WAR_PROTECTION_ROUNDS + 1) + ' başlayana kadar savaş ilan edilemez ve işgal yapılamaz.');
+      }
       const key = pairKey(pid, to);
       if (this.allies.has(key)) return this.reject(pid, 'ally_war');
       if (this.wars.has(key)) return this.reject(pid, 'already_war');
+      const lk = this.lockOf(pid, to);
+      if (lk && (lk.type === 'peace' || lk.type === 'breakup')) {
+        return this.reject(pid, 'lock', (lk.type === 'peace' ? '🕊 Barış antlaşması' : '💔 İttifak bozma') + ' kilidi: ' + (lk.until - this.round) + ' tur sonra savaş ilan edebilirsin.');
+      }
       const startRound = this.round + this.cfg.WAR_DELAY_ROUNDS;
       this.wars.set(key, { a: pid, b: to, declared: this.round, startRound: startRound, active: false });
       this.dropProposalsBetween(pid, to);
-      this.news('⚔ ' + g.p.name + ', ' + g.t.name + ' ülkesine SAVAŞ İLAN ETTİ! Savaş TUR ' + startRound + ' başında başlıyor.', 'war');
+      this.news('⚔ ' + g.p.name + ', ' + g.t.name + ' ülkesine SAVAŞ İLAN ETTİ! Savaş TUR ' + startRound + ' başında başlıyor.', 'war', [pid, to]);
       this.notice(to, '⚔ ' + g.p.name + ' sana savaş ilan etti! TUR ' + startRound + ' başında saldırabilir.', 'war');
       this.emitDiploAll();
     }
@@ -1356,8 +1840,13 @@
       if (!g) return;
       const key = pairKey(pid, to);
       if (!this.allies.has(key)) return this.reject(pid, 'not_allied');
+      const lk = this.lockOf(pid, to);
+      if (lk && lk.type === 'alliance') {
+        return this.reject(pid, 'lock', '🤝 İttifak kilidi: ' + (lk.until - this.round) + ' tur boyunca ittifak bozulamaz.');
+      }
       this.allies.delete(key);
-      this.news('💔 ' + g.p.name + ', ' + g.t.name + ' ile ittifakını BOZDU.', 'war');
+      this.setLock(pid, to, 'breakup');
+      this.news('💔 ' + g.p.name + ', ' + g.t.name + ' ile ittifakını BOZDU.', 'war', [pid, to]);
       this.emitDiploAll();
     }
 
@@ -1369,6 +1858,8 @@
       if (kind === 'alliance') {
         if (this.allies.has(key)) return this.reject(pid, 'already_ally');
         if (this.wars.has(key)) return this.reject(pid, 'at_war');
+        const lk = this.lockOf(pid, to);
+        if (lk && lk.type === 'breakup') return this.reject(pid, 'lock', '💔 İttifak bozma kilidi: ' + (lk.until - this.round) + ' tur sonra yeniden ittifak teklif edebilirsin.');
       } else if (!this.wars.has(key)) {
         return this.reject(pid, 'no_war_with');
       }
@@ -1399,8 +1890,9 @@
         if (accept) {
           if (this.wars.has(key)) { this.reject(pid, 'at_war'); return this.emitDiploAll(); }
           this.allies.add(key);
+          this.setLock(pid, pr.from, 'alliance');
           this.dropProposalsBetween(pid, pr.from);
-          this.news('🤝 ' + from.name + ' ve ' + me.name + ' İTTİFAK kurdu!', 'ally');
+          this.news('🤝 ' + from.name + ' ve ' + me.name + ' İTTİFAK kurdu!', 'ally', [pr.from, pid]);
         } else {
           this.notice(pr.from, me.name + ' ittifak teklifini reddetti.', 'war');
         }
@@ -1408,8 +1900,11 @@
         if (!this.wars.has(key)) return this.emitDiploAll();
         if (accept) {
           this.wars.delete(key);
+          this.setLock(pid, pr.from, 'peace');
+          this.clearWarState(pid, pr.from);
           this.dropProposalsBetween(pid, pr.from);
-          this.news('🕊 ' + from.name + ' ve ' + me.name + ' BARIŞ yaptı! Savaş sona erdi.', 'peace');
+          this.news('🕊 ' + from.name + ' ve ' + me.name + ' BARIŞ yaptı! Savaş sona erdi.', 'peace', [pr.from, pid]);
+          this.maybePromptCapital(from); this.maybePromptCapital(me);   // kaybedilen başkent için yeniden seçim
         } else {
           this.notice(pr.from, me.name + ' barış teklifini REDDETTİ — piksel savaşı devam ediyor!', 'war');
         }
@@ -1423,8 +1918,9 @@
       if (!p) return;
       text = sanitizeChat(text, this.cfg.CHAT_MAX);
       if (!text) return;
-      if (this.tickCount - p.lastChat < this.cfg.CHAT_COOLDOWN_TICKS) return this.reject(pid, 'cooldown');
-      p.lastChat = this.tickCount;
+      const wait = this.cfg.CHAT_COOLDOWN_MS - (this.nowMs - p.lastChat);
+      if (wait > 0) return this.reject(pid, 'cooldown', 'Gazete için ' + Math.ceil(wait / 1000) + ' sn bekle.');
+      p.lastChat = this.nowMs;
       this.emit({ t: 'chat', from: pid, text: text });
     }
     dm(pid, to, text) {
@@ -1432,8 +1928,9 @@
       if (!p || !t || to === pid) return;
       text = sanitizeChat(text, this.cfg.CHAT_MAX);
       if (!text) return;
-      if (this.tickCount - p.lastDm < this.cfg.CHAT_COOLDOWN_TICKS) return this.reject(pid, 'cooldown');
-      p.lastDm = this.tickCount;
+      const wait = this.cfg.DM_COOLDOWN_MS - (this.nowMs - p.lastDm);
+      if (wait > 0) return this.reject(pid, 'cooldown', 'Mesaj için ' + Math.ceil(wait / 1000) + ' sn bekle.');
+      p.lastDm = this.nowMs;
       const msg = { t: 'dm', from: pid, to: to, text: text };
       this.emit(msg, pid); this.emit(msg, to);
     }
@@ -1445,8 +1942,9 @@
       if (!p) return;
       switch (msg.t) {
         case 'paint': return this.paint(pid, msg.cells);
+        case 'capital': return this.chooseCapital(pid, msg.idx);
+        case 'color': return this.setColor(pid, msg.color);
         case 'gift': return this.gift(pid, msg.to, msg.cells);
-        case 'end': return this.endTurn(pid);
         case 'chat': return this.chat(pid, msg.text);
         case 'dm': return this.dm(pid, msg.to, msg.text);
         case 'propose': return this.propose(pid, msg.kind, msg.to);
@@ -1462,13 +1960,18 @@
     publicPlayers() {
       return Array.from(this.players.values()).map(p => ({
         id: p.id, name: p.name, color: p.color, px: p.px, alive: p.alive, bot: p.isBot,
-        conn: p.connected, ended: p.ended, cap: p.capital
+        conn: p.connected, cap: p.capital, hasFlag: !!p.flag
       }));
+    }
+    flagsFor(ids) {
+      const f = {};
+      for (const p of this.players.values()) if (p.flag && (!ids || ids.includes(p.id))) f[p.id] = p.flag;
+      return f;
     }
     youFor(pid) {
       const p = this.players.get(pid);
       if (!p) return null;
-      return { pool: p.pool, actions: p.actions, dice: p.dice.slice(), capital: p.capital, ended: p.ended, alive: p.alive };
+      return { pool: p.pool, points: p.points, dice: p.dice.slice(), capital: p.capital, alive: p.alive, queue: p.queue.length, needCap: p.needCapital, capDue: p.capDue, giftCd: Math.max(0, p.giftUntil - this.round) };
     }
     diploFor(pid) {
       const wars = [];
@@ -1478,16 +1981,24 @@
       for (const pr of this.proposals.values()) {
         if (pr.from === pid || pr.to === pid) props.push({ id: pr.id, kind: pr.kind, from: pr.from, to: pr.to, exp: pr.exp });
       }
-      return { t: 'diplo', wars: wars, allies: allies, props: props };
+      const locks = [];
+      for (const [k, l] of this.locks) if (l.until > this.round) { const [a, b] = k.split('-').map(Number); locks.push([a, b, l.type, l.until]); }
+      return { t: 'diplo', wars: wars, allies: allies, props: props, locks: locks };
     }
     snapshotFor(pid) {
       const s = {
         t: 'snap', phase: this.phase, timer: this.timer, round: this.round, countdown: this.countdown,
+        wait: this.phase === 'LOBBY' ? Math.max(0, this.cfg.LOBBY_WAIT_SECONDS - this.lobbyElapsed) : 0,
         max: this.cfg.MAX_PLAYERS, min: this.cfg.MIN_PLAYERS,
         players: this.publicPlayers(), you: this.youFor(pid), diplo: this.diploFor(pid),
-        winners: this.winners
+        winners: this.winners, rank: this.rank, match: this.matchId, nv: this.navalLeftMs()
       };
-      if (this.phase !== 'LOBBY') s.grid = rleEncode(this.grid);
+      if (this.phase !== 'LOBBY') {
+        s.grid = rleEncode(this.grid);
+        s.pending = Array.from(this.pending);
+        s.seaExpiries = Array.from(this.seaExpiries);
+        s.activeCaptures = Array.from(this.players.values()).filter(p => p.queue.length && p.queue[0].started).map(p => [p.id, p.queue[0].idx, p.queue[0].ms, p.queue[0].left]);
+      }
       return s;
     }
     emitSnapshot(pid) { const p = this.players.get(pid); if (p && !p.isBot) this.emit(this.snapshotFor(pid), pid); }
@@ -1496,11 +2007,14 @@
     emitDiplo(pid) { const p = this.players.get(pid); if (p && !p.isBot) this.emit(this.diploFor(pid), pid); }
     emitDiploAll() { for (const p of this.players.values()) if (!p.isBot) this.emit(this.diploFor(p.id), p.id); }
     emitTick() {
-      this.emit({
+      const m = {
         t: 'tick', phase: this.phase, timer: this.timer, round: this.round, countdown: this.countdown,
-        n: this.players.size,
-        ps: Array.from(this.players.values()).map(p => [p.id, p.px, p.alive ? 1 : 0, p.ended ? 1 : 0, p.connected ? 1 : 0])
-      });
+        wait: this.phase === 'LOBBY' ? Math.max(0, this.cfg.LOBBY_WAIT_SECONDS - this.lobbyElapsed) : 0,
+        n: this.players.size, nv: this.navalLeftMs(),
+        ps: Array.from(this.players.values()).map(p => [p.id, p.px, p.alive ? 1 : 0, p.connected ? 1 : 0, p.capital])
+      };
+      if (this.phase !== 'LOBBY' && this.tickCount % 5 === 0) m.h = gridHash(this.grid); // istemci senkron doğrulaması
+      this.emit(m);
     }
 
     /* ---------- BOTLAR (aynı doğrulanmış API'yi kullanır) ---------- */
@@ -1512,38 +2026,27 @@
         for (let tries = 0; tries < 60 && idx < 0; tries++) {
           const cand = Math.floor(this.rng() * N);
           if (!LAND_MASK[cand] || this.grid[cand] !== -1) continue;
-          const cr = (cand / COLS) | 0, cc = cand % COLS;
-          if (caps.every(k => Math.max(Math.abs(((k / COLS) | 0) - cr), Math.abs((k % COLS) - cc)) > 6)) idx = cand;
+          if (caps.every(k => cheb(k, cand) > 6)) idx = cand;
         }
         if (idx < 0) idx = this.pickRandomFreeLand();
-        if (idx >= 0) this.paint(p.id, [idx]);
+        if (idx >= 0) this.chooseCapital(p.id, idx);
       }
-      if (p.pool > 0) {
-        const cells = this.growShape(p, p.pool, true);
-        this.paint(p.id, cells);
-      }
+      if (p.pool > 0 && p.capital >= 0) this.paint(p.id, this.growShape(p, p.pool, false));
     }
 
     neighborOwners(pid) {
       const set = new Set(), g = this.grid;
       for (let i = 0; i < N; i++) {
         if (g[i] !== pid || !LAND_MASK[i]) continue;
-        const r = (i / COLS) | 0, c = i - r * COLS;
-        for (let k = 0; k < 8; k++) {
-          const nr = r + DIRS8[k][0], nc = c + DIRS8[k][1];
-          if (nr < 0 || nr >= ROWS || nc < 0 || nc >= COLS) continue;
-          const o = g[nr * COLS + nc];
-          if (o > 0 && o !== pid) set.add(o);
-        }
+        anyNeighbor(i, (n) => { if (g[n] > 0 && g[n] !== pid) set.add(g[n]); return false; });
       }
       return Array.from(set);
     }
 
     botAct(p) {
-      if (this.phase !== 'PLAYING' || !p.alive || p.ended) return;
+      if (this.phase !== 'PLAYING' || !p.alive) return;
       this.botDiplomacy(p);
       this.botExpand(p);
-      p.ended = true;
     }
 
     botDiplomacy(p) {
@@ -1554,52 +2057,46 @@
       }
       if (this.phase !== 'PLAYING' || !p.alive) return;
       const others = this.aliveList().filter(q => q.id !== p.id);
-      if (this.round >= 2 && others.length && this.rng() < 0.15) {
-        const cands = others.filter(q => !this.isAlly(p.id, q.id) && !this.wars.has(pairKey(p.id, q.id)));
+      if (this.round >= 2 && others.length && this.rng() < 0.12) {
+        const cands = others.filter(q => !this.isAlly(p.id, q.id) && !this.wars.has(pairKey(p.id, q.id)) && !this.lockOf(p.id, q.id));
         if (cands.length) this.propose(p.id, 'alliance', cands[Math.floor(this.rng() * cands.length)].id);
       }
       const myWars = Array.from(this.wars.values()).filter(w => w.a === p.id || w.b === p.id);
-      if (this.round >= 3 && !myWars.length && this.rng() < 0.22) {
-        const nb = this.neighborOwners(p.id).filter(id => !this.isAlly(p.id, id) && this.players.get(id).alive);
+      if (this.round > this.cfg.WAR_PROTECTION_ROUNDS && !myWars.length && this.rng() < 0.18) {
+        const nb = this.neighborOwners(p.id).filter(id => !this.isAlly(p.id, id) && !this.lockOf(p.id, id) && this.players.get(id).alive);
         if (nb.length) this.declareWar(p.id, nb[Math.floor(this.rng() * nb.length)]);
       }
       for (const w of myWars) {
-        if (w.active && this.round - w.startRound >= 2 && this.rng() < 0.25) {
-          this.propose(p.id, 'peace', w.a === p.id ? w.b : w.a);
-        }
+        if (w.active && this.round - w.startRound >= 3 && this.rng() < 0.25) this.propose(p.id, 'peace', w.a === p.id ? w.b : w.a);
       }
     }
 
     botExpand(p) {
-      if (!p.alive || p.actions <= 0) return;
+      if (!p.alive || p.points <= 0) return;
       const g = this.grid, me = p.id;
       const qualifies = (i) => {
         if (!LAND_MASK[i]) return false;
         const o = g[i];
+        if (this.pending.has(i)) return false;
         return o === -1 || (o > 0 && o !== me && this.activeWar(me, o));
-      };
-      const nbrs = (i, fn) => {
-        const r = (i / COLS) | 0, c = i - r * COLS;
-        for (let k = 0; k < 8; k++) {
-          const nr = r + DIRS8[k][0], nc = c + DIRS8[k][1];
-          if (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS) fn(nr * COLS + nc);
-        }
       };
       const free = new Set(), enemy = new Set(), chosen = new Set();
       const add = (i) => {
         if (chosen.has(i) || !qualifies(i)) return;
         if (g[i] === -1) free.add(i); else enemy.add(i);
       };
-      for (let i = 0; i < N; i++) if (g[i] === me && LAND_MASK[i]) nbrs(i, add);
+      for (let i = 0; i < N; i++) if (g[i] === me && LAND_MASK[i]) anyNeighbor(i, (n) => { add(n); return false; });
+      const room = Math.max(0, this.cfg.MAX_QUEUE - p.queue.length);
+      const want = Math.min(p.points, room);
       const list = [];
-      for (let k = 0; k < p.actions; k++) {
+      for (let k = 0; k < want; k++) {
         if (!free.size && !enemy.size) break;
         let pool;
         if (enemy.size && (!free.size || this.rng() < 0.75)) pool = enemy; else pool = free;
         const arr = Array.from(pool);
         const idx = arr[Math.floor(this.rng() * arr.length)];
         pool.delete(idx); chosen.add(idx); list.push(idx);
-        nbrs(idx, add);
+        anyNeighbor(idx, (n) => { add(n); return false; });
       }
       for (let i = 0; i < list.length; i += this.cfg.MAX_CELLS_PER_MESSAGE) {
         this.paint(me, list.slice(i, i + this.cfg.MAX_CELLS_PER_MESSAGE));
@@ -1613,21 +2110,23 @@
     constructor(opts) {
       opts = opts || {};
       this.id = opts.id || 'room';
+      this.name = opts.name || this.id;
       this.game = new Game(opts);
       this.sends = new Map();       // pid -> send(obj)
-      this.autoBotsAfter = opts.autoBotsAfter || 0;   // sn (tick); 0 = kapalı
-      this.autoBotsPerTick = opts.autoBotsPerTick || 1;
-      this.lobbyTicks = 0;
       this.emptyTicks = 0;
     }
     welcomeFor(pid, token) {
-      return { t: 'welcome', you: pid, token: token, cfg: this.game.publicCfg() };
+      return { t: 'welcome', you: pid, token: token, room: this.id, roomName: this.name, cfg: this.game.publicCfg() };
     }
+    sendFlags(send) { const f = this.game.flagsFor(null); if (Object.keys(f).length) send({ t: 'flags', f: f }); }
     join(send, msg) {
-      const r = this.game.addPlayer({ name: msg && msg.name, color: msg && msg.color }, false);
+      const r = this.game.addPlayer({ name: msg && msg.name, color: msg && msg.color, flag: msg && msg.flag }, false);
       if (!r.ok) return r;
       this.sends.set(r.pid, send);
       send(this.welcomeFor(r.pid, r.token));
+      this.sendFlags(send);
+      const mine = this.game.flagsFor([r.pid]);
+      if (mine[r.pid]) for (const [pid, s] of this.sends) if (pid !== r.pid) s({ t: 'flags', f: mine });
       this.flush();
       return r;
     }
@@ -1642,6 +2141,7 @@
       this.sends.set(p.id, send);
       this.game.setConnected(p.id, true);
       send(this.welcomeFor(p.id, p.token));
+      this.sendFlags(send);
       send(this.game.snapshotFor(p.id));
       return { ok: true, pid: p.id, token: p.token };
     }
@@ -1655,19 +2155,15 @@
       this.game.handle(pid, msg);
       this.flush();
     }
-    addBot() { const r = this.game.addBot(); return r; }
-    tick() {
+    // gerçek zaman ilerletme: fetih ilerlemesi (ms hassasiyeti) + saniyelik tick
+    advance(ms) {
       const g = this.game;
-      if (g.phase === 'LOBBY' && this.autoBotsAfter > 0 && g.connectedHumans() > 0) {
-        this.lobbyTicks++;
-        if (this.lobbyTicks >= this.autoBotsAfter) {
-          for (let k = 0; k < this.autoBotsPerTick && g.players.size < g.cfg.MIN_PLAYERS; k++) g.addBot();
-        }
-      }
-      g.tick();
-      this.emptyTicks = (g.connectedHumans() === 0) ? this.emptyTicks + 1 : 0;
+      const before = g.tickCount;
+      g.advance(ms);
+      if (g.tickCount !== before) this.emptyTicks = (g.connectedHumans() === 0) ? this.emptyTicks + (g.tickCount - before) : 0;
       this.flush();
     }
+    tick() { this.advance(1000); }
     flush() {
       const items = this.game.drain();
       for (const it of items) {
@@ -1675,6 +2171,8 @@
         else { const s = this.sends.get(it.to); if (s) s(it.msg); }
       }
     }
+    drainSuspects() { const a = Array.from(this.game.suspects); this.game.suspects.clear(); return a; }
+    info() { return Object.assign({ id: this.id, name: this.name }, this.game.info()); }
     isFinished() {
       const g = this.game;
       if (g.phase === 'ENDED' && g.overTimer <= 0) return true;
@@ -1684,18 +2182,19 @@
   }
 
   return {
-    PROTOCOL, CONFIG, NATIONS, SEA_COLOR, LAND_COLOR, MAP_DATA, MAP_HASH, ROWS, COLS, N, LAND_MASK, DIRS8,
-    REJECT_TEXT, Game, Room, captureCheck, adjacentOwned, rleEncode, rleDecode, freshGrid,
-    sanitizeName, sanitizeChat, normalizeColor, hexToRgb, colorDistance, pairKey, mulberry32, hash32
+    PROTOCOL, CONFIG, PALETTE, PALETTE_HEX, SEA_COLOR, LAND_COLOR, MAP_DATA, MAP_HASH, ROWS, COLS, N, LAND_MASK, DIRS8,
+    FLAG_W, FLAG_H, FLAG_B64_LEN, REJECT_TEXT, Game, Room, captureCheck, adjacentOwned, anyNeighbor, rleEncode, rleDecode,
+    freshGrid, sanitizeName, sanitizeChat, normalizeColor, hexToRgb, colorDistance, pairKey, mulberry32, hash32, gridHash,
+    validateFlag, isBlueish, hslToHex, cheb, expansionRate
   };
 });
     </script>
     <script>
         /* ====================================================================
-         *  İSTEMCİ  —  sadece "niyet" gönderir, durum sunucudan (veya yerel
+         *  İSTEMCİ v2 — sadece "niyet" gönderir, durum sunucudan (veya yerel
          *  otoriter simülasyondan) gelir. Kurallar PXCore (px-core) içindedir.
          * ================================================================== */
-        const { ROWS, COLS, N, LAND_MASK, NATIONS } = PXCore;
+        const { ROWS, COLS, N, LAND_MASK, PALETTE } = PXCore;
 
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
@@ -1714,20 +2213,20 @@
         /* ---------------------------------------------------------------- durum */
         let ui = 'FORM'; // FORM | CONNECTING | WAITING | GAME
         const S = {
-            me: 0, cfg: null, phase: 'LOBBY', timer: 0, round: 0, countdown: null, n: 0, min: 10, max: 16,
-            players: new Map(), grid: null,
-            wars: [], allies: [], props: [],
-            you: { pool: 0, actions: 0, dice: [0, 0], capital: -1, ended: false, alive: true },
-            gift: null, mode: 'local'
+            me: 0, cfg: null, roomName: '', phase: 'LOBBY', timer: 0, round: 0, countdown: null, wait: 0, n: 0, min: 10, max: 20,
+            players: new Map(), flags: new Map(), grid: null, pending: new Map(), seaExpiries: new Map(), activeCaptures: new Map(),
+            wars: [], allies: [], props: [], locks: [],
+            you: { pool: 0, points: 0, dice: [0, 0], capital: -1, alive: true, queue: 0, needCap: false, capDue: 0, giftCd: 0 },
+            gift: null, mode: 'local', capCand: -1, relocating: false, navalAt: Infinity, navToast: false, capBar: null, match: ''
         };
         let canChatGazette = true;
         let canChat1v1 = true;
         let active1v1Partner = null;
         let unreadMessages = {};
         let private1v1Logs = {};
-        let selectedColor = null;
         let centeredOnCapital = false;
-        let takenColors = [];
+        let joinRoomId = '';
+        let joinMode = '';   // 'lobby' | 'duel' (ana menüden gelir; sunucu uygun odayı seçer)
 
         const SEA_RGB = [41, 128, 185], LAND_RGB = [44, 62, 80];
         const $ = (id) => document.getElementById(id);
@@ -1736,15 +2235,50 @@
             return String(string).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
         }
         function safeColor(c) { return /^#[0-9a-fA-F]{6}$/.test(c) ? c : '#ffffff'; }
-        function hexToRgba(hex, alpha) {
-            hex = safeColor(hex).replace('#', '');
-            return `rgba(${parseInt(hex.substring(0, 2), 16)}, ${parseInt(hex.substring(2, 4), 16)}, ${parseInt(hex.substring(4, 6), 16)}, ${alpha})`;
-        }
         function store(kind, k, v) {
             try { const st = kind === 'session' ? sessionStorage : localStorage; if (v === undefined) return st.getItem(k); if (v === null) st.removeItem(k); else st.setItem(k, v); } catch (e) { /* depolama kapalı */ }
             return null;
         }
         function pl(id) { return S.players.get(id); }
+
+        /* ================================================ BAYRAK (30x15 KİLİTLİ) ====
+         * Bayrak = 450 piksel x RGB = 1350 bayt -> base64 (1800 karakter). Ana menüde üretilir,
+         * sunucuya yalnızca bu biçimde gönderilir; her yerde 30x15 oranıyla çizilir. */
+        const FLAG_RE = /^[A-Za-z0-9+/]{1800}$/;
+        const flagCache = new Map();
+        function hashStr(s) { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
+        function flagCanvasFromB64(b64) {
+            if (typeof b64 !== 'string' || !FLAG_RE.test(b64)) return null;
+            const bin = atob(b64);
+            const cv = document.createElement('canvas'); cv.width = 30; cv.height = 15;
+            const c = cv.getContext('2d'); const img = c.createImageData(30, 15);
+            for (let i = 0; i < 450; i++) {
+                img.data[i * 4] = bin.charCodeAt(i * 3); img.data[i * 4 + 1] = bin.charCodeAt(i * 3 + 1);
+                img.data[i * 4 + 2] = bin.charCodeAt(i * 3 + 2); img.data[i * 4 + 3] = 255;
+            }
+            c.putImageData(img, 0, 0);
+            return cv;
+        }
+        function defaultFlagCanvas(seedStr) { // bayrağı olmayanlar (botlar) için kimliğe göre sabit üçlü şerit
+            const h = hashStr(seedStr || 'x');
+            const cols = [0, 1, 2].map(i => `hsl(${(h >> (i * 7)) % 360}, 65%, ${40 + ((h >> (i * 3)) % 25)}%)`);
+            const cv = document.createElement('canvas'); cv.width = 30; cv.height = 15; const c = cv.getContext('2d');
+            const vertical = (h & 1) === 1;
+            for (let i = 0; i < 3; i++) { c.fillStyle = cols[i]; if (vertical) c.fillRect(i * 10, 0, 10, 15); else c.fillRect(0, i * 5, 30, 5); }
+            return cv;
+        }
+        function flagFor(id) {
+            const key = S.flags.get(id) || '';
+            const p = S.players.get(id);
+            let e = flagCache.get(id);
+            if (e && e.key === key) return e;
+            const cv = flagCanvasFromB64(key) || defaultFlagCanvas((p ? p.name : '') + id);
+            e = { key: key, canvas: cv, url: cv.toDataURL('image/png') };
+            flagCache.set(id, e);
+            return e;
+        }
+        function flagImg(id) { return `<img class="flag30" width="30" height="15" src="${flagFor(id).url}" alt="">`; }
+        function myFlagB64() { const f = store('local', 'px_flag'); return (f && FLAG_RE.test(f)) ? f : ''; }
 
         /* ------------------------------------------------------------- toast */
         const toastSeen = {};
@@ -1764,7 +2298,6 @@
         }
 
         /* ===================================================== AĞ KATMANI ====
-         * İki taşıyıcı, aynı arayüz: send(msg) + onMsg(msg) + onStatus(status)
          *   LocalTransport : tarayıcıda PXCore.Room (botlu, çevrimdışı)
          *   WsTransport    : VPS üzerindeki Node sunucusu (Cloudflare arkasında wss://)
          * ================================================================= */
@@ -1772,22 +2305,25 @@
             constructor(onMsg, onStatus) { this.onMsg = onMsg; this.onStatus = onStatus; this.stopped = false; }
             connect(first) {
                 const seed = (Math.random() * 0x7fffffff) | 0;
-                this.room = new PXCore.Room({ id: 'local', rng: PXCore.mulberry32(seed), autoBotsAfter: 1, autoBotsPerTick: 4 });
+                // çevrimdışı: 60 sn yerine 12 sn sonra botlarla başlar (diğer her kural aynı)
+                const duel = first && first.mode === 'duel';
+                const cfg = duel ? { MIN_PLAYERS: 2, MAX_PLAYERS: 2, BOT_FILL_TO: 2, LOBBY_COUNTDOWN: 5, LOBBY_WAIT_SECONDS: 6, WAR_PROTECTION_ROUNDS: 2, EXP_REWARDS: [30, 0] } : { LOBBY_WAIT_SECONDS: 12 };
+                this.room = new PXCore.Room({ id: 'local', name: duel ? 'Yerel Düello' : 'Yerel Sunucu', rng: PXCore.mulberry32(seed), config: cfg });
                 const send = (msg) => {
                     const copy = JSON.parse(JSON.stringify(msg)); // ağ benzetimi: nesne paylaşımı yok
                     setTimeout(() => { if (!this.stopped) this.onMsg(copy); }, 0);
                 };
-                const r = this.room.join(send, { name: first.name, color: first.color });
-                if (!r.ok) { setTimeout(() => this.onMsg({ t: 'error', code: r.code, text: r.text, taken: r.taken }), 0); return; }
+                const r = this.room.join(send, { name: first.name, flag: first.flag });
+                if (!r.ok) { setTimeout(() => this.onMsg({ t: 'error', code: r.code, text: r.text }), 0); return; }
                 this.pid = r.pid;
                 this.onStatus('open');
                 this.last = Date.now(); this.acc = 0;
                 this.timer = setInterval(() => {
                     const now = Date.now(); this.acc += now - this.last; this.last = now;
-                    let steps = Math.min(120, Math.floor(this.acc / 1000));
-                    this.acc -= Math.floor(this.acc / 1000) * 1000;
-                    for (let i = 0; i < steps; i++) this.room.tick();
-                }, 250);
+                    let steps = Math.min(1200, Math.floor(this.acc / 100));
+                    this.acc = Math.min(this.acc, 100000) - Math.floor(this.acc / 100) * 100;
+                    for (let i = 0; i < steps; i++) this.room.advance(100);
+                }, 100);
             }
             send(msg) {
                 if (this.stopped || !this.room || !this.pid) return;
@@ -1797,10 +2333,11 @@
             close() { this.stopped = true; clearInterval(this.timer); }
         }
 
+        const SEQ_TYPES = ['paint', 'gift', 'capital', 'color', 'chat', 'dm', 'propose', 'respond', 'war', 'unally'];
         class WsTransport {
             constructor(url, onMsg, onStatus) {
                 this.url = url; this.onMsg = onMsg; this.onStatus = onStatus;
-                this.token = null; this.joined = false; this.everOpen = false; this.stopped = false; this.tries = 0;
+                this.token = null; this.joined = false; this.everOpen = false; this.stopped = false; this.tries = 0; this.seq = 0;
             }
             connect(first, token) { this.first = first; this.token = token || null; this.openSocket(); }
             openSocket() {
@@ -1833,7 +2370,10 @@
                 ws.onerror = () => { /* onclose ele alır */ };
             }
             raw(m) { if (this.ws && this.ws.readyState === 1) this.ws.send(JSON.stringify(m)); }
-            send(m) { this.raw(m); }
+            send(m) {
+                if (SEQ_TYPES.indexOf(m.t) >= 0) m = Object.assign({ seq: ++this.seq }, m); // anti-replay sıra numarası
+                this.raw(m);
+            }
             close() {
                 this.stopped = true; clearInterval(this.hb);
                 try { if (this.ws && this.ws.readyState === 1) this.ws.send(JSON.stringify({ t: 'leave' })); } catch (e) { /* */ }
@@ -1874,17 +2414,23 @@
         }
 
         /* ---------------------------------------------------- gelen mesajlar */
+        let lastSyncReq = 0;
         function onNet(m) {
             if (!m || typeof m.t !== 'string') return;
             if (ui === 'FORM' && m.t !== 'error') return; // oyundan çıkıldıysa eski mesajları yok say
             switch (m.t) {
                 case 'welcome': return onWelcome(m);
+                case 'flags': return onFlags(m);
                 case 'snap': return onSnap(m);
                 case 'tick': return onTick(m);
                 case 'cells': return applyCells(m.c);
+                case 'capq': for (const i of m.c) S.pending.set(i, m.pid); return;
+                case 'capcancel': for (const i of m.c) { S.pending.delete(i); if (S.activeCaptures.get(m.pid) === i) S.activeCaptures.delete(m.pid); } return;
+                case 'capstart': S.activeCaptures.set(m.pid, m.idx); if (m.pid === S.me) S.capBar = { start: performance.now(), ms: m.ms }; return;
                 case 'you': return onYou(m);
+                case 'capital_prompt': toast('🏛 Yeni başkent seç! Kendi pikselinize tıkla (' + m.secs + ' sn).', 'ok', 6000); return;
                 case 'diplo': return onDiplo(m);
-                case 'news': return addNews(m.text, m.kind);
+                case 'news': return addNews(m.text, m.kind, m.who);
                 case 'notice': return toast(m.text, m.kind);
                 case 'reject': return toastOnce('rej_' + m.code, m.text, 'bad', 1500);
                 case 'chat': return onChat(m);
@@ -1897,60 +2443,80 @@
         }
 
         function onWelcome(m) {
-            if (m.cfg && m.cfg.mapHash !== PXCore.MAP_HASH) {
+            if (m.cfg && (m.cfg.mapHash !== PXCore.MAP_HASH || m.cfg.proto !== PXCore.PROTOCOL)) {
                 Net.stop();
-                return backToForm('İstemci/sunucu sürümleri uyumsuz (harita farklı). Sayfayı yenile (Ctrl+F5).');
+                return backToForm('İstemci/sunucu sürümleri uyumsuz. Sayfayı yenile (Ctrl+F5).');
             }
-            S.me = m.you; S.cfg = m.cfg;
+            S.me = m.you; S.cfg = m.cfg; S.roomName = m.roomName || '';
             S.min = m.cfg.MIN_PLAYERS; S.max = m.cfg.MAX_PLAYERS;
+            S.flags = new Map(); flagCache.clear();
         }
-
-        function onYou(m) {
-            S.you = { pool: m.pool, actions: m.actions, dice: m.dice, capital: m.capital, ended: m.ended, alive: m.alive };
-            if (ui === 'GAME' && m.capital >= 0 && !centeredOnCapital) centerOnCell(m.capital);
-            updateHud();
+        function onFlags(m) {
+            for (const k of Object.keys(m.f || {})) { S.flags.set(Number(k), m.f[k]); flagCache.delete(Number(k)); }
+            if (ui === 'WAITING') renderWaiting();
+            if (ui === 'GAME') { refreshDiplomacyList(); renderDiploActions(); }
         }
 
         function onNetError(m) {
             if (m.code === 'resume_failed') { return backToForm(''); }
-            if (m.taken) takenColors = m.taken;
-            renderNationCards();
             backToForm(m.text || 'Hata: ' + m.code);
         }
 
+        function onYou(m) {
+            S.you = { pool: m.pool, points: m.points, dice: m.dice, capital: m.capital, alive: m.alive, queue: m.queue, needCap: m.needCap, capDue: m.capDue, giftCd: m.giftCd || 0 };
+            if (!m.queue) S.capBar = null;
+            if (ui === 'GAME' && m.capital >= 0 && !centeredOnCapital) centerOnCell(m.capital);
+            syncCapSelect();
+            updateHud();
+        }
+
         function onSnap(m) {
-            S.phase = m.phase; S.timer = m.timer; S.round = m.round; S.countdown = m.countdown;
-            S.min = m.min || S.min; S.max = m.max || S.max;
+            S.phase = m.phase; S.timer = m.timer; S.round = m.round; S.countdown = m.countdown; S.wait = m.wait || 0;
+            syncNaval(m);
+            S.min = m.min || S.min; S.max = m.max || S.max; S.match = m.match || '';
             S.players = new Map(m.players.map(p => [p.id, p]));
             S.n = m.players.length;
-            if (m.you) S.you = m.you;
-            if (m.diplo) { S.wars = m.diplo.wars; S.allies = m.diplo.allies; S.props = m.diplo.props; }
+            if (m.you) S.you = { pool: m.you.pool, points: m.you.points, dice: m.you.dice, capital: m.you.capital, alive: m.you.alive, queue: m.you.queue, needCap: m.you.needCap, capDue: m.you.capDue, giftCd: m.you.giftCd || 0 };
+            if (m.diplo) { S.wars = m.diplo.wars; S.allies = m.diplo.allies; S.props = m.diplo.props; S.locks = m.diplo.locks || []; }
             colorCache.clear();
             if (m.grid) {
                 try { S.grid = PXCore.rleDecode(m.grid, N); } catch (e) { Net.send({ t: 'sync' }); return; }
+                S.pending = new Map(m.pending || []);
+                S.seaExpiries = new Map(m.seaExpiries || []);
+                S.activeCaptures = new Map((m.activeCaptures || []).map(row => [row[0], row[1]]));
+                S.capBar = null;
                 rebuildMap();
             }
             if (m.phase === 'LOBBY') { if (ui !== 'WAITING') showWaiting(); renderWaiting(); }
             else { if (ui !== 'GAME') enterGame(); }
             if (ui === 'GAME') {
                 if (m.you && m.you.capital >= 0 && !centeredOnCapital) centerOnCell(m.you.capital);
-                refreshDiplomacyList(); renderDiploActions(); updateHud(); updateBadges();
+                syncCapSelect(); refreshDiplomacyList(); renderDiploActions(); updateHud(); updateBadges();
             }
-            if (m.phase === 'ENDED' && m.winners) onOver({ winners: m.winners, reason: '' });
+            if (m.phase === 'ENDED' && m.rank) onOver({ winners: m.winners, reason: '', rank: m.rank, match: m.match });
         }
 
         function onTick(m) {
-            S.phase = m.phase; S.timer = m.timer; S.round = m.round; S.countdown = m.countdown; S.n = m.n;
+            S.phase = m.phase; S.timer = m.timer; S.round = m.round; S.countdown = m.countdown; S.n = m.n; S.wait = m.wait || 0;
+            syncNaval(m);
             for (const row of m.ps) {
                 const p = S.players.get(row[0]);
-                if (p) { p.px = row[1]; p.alive = !!row[2]; p.ended = !!row[3]; p.conn = !!row[4]; }
+                if (p) {
+                    const oldCap = p.cap;
+                    p.px = row[1]; p.alive = !!row[2]; p.conn = !!row[3]; p.cap = row[4];
+                    if (oldCap !== p.cap && S.grid) { if (oldCap >= 0) paintPx(oldCap); if (p.cap >= 0) paintPx(p.cap); mapDirty = true; }
+                }
+            }
+            // durum senkronu doğrulaması: sunucu ızgara özeti ile yerel ızgara özeti eşleşmeli
+            if (m.h !== undefined && S.grid && PXCore.gridHash(S.grid) !== m.h && Date.now() - lastSyncReq > 8000) {
+                lastSyncReq = Date.now(); Net.send({ t: 'sync' });
             }
             if (ui === 'WAITING') renderWaiting();
-            if (ui === 'GAME') { updateHud(); }
+            if (ui === 'GAME') { updateHud(); if (active1v1Partner) renderDiploActions(); }
         }
 
         function onDiplo(m) {
-            S.wars = m.wars; S.allies = m.allies; S.props = m.props;
+            S.wars = m.wars; S.allies = m.allies; S.props = m.props; S.locks = m.locks || [];
             frontDirty = true;
             if (ui === 'GAME') { refreshDiplomacyList(); renderDiploActions(); updateHud(); updateBadges(); }
         }
@@ -1958,71 +2524,59 @@
         /* ---------------------------------------------------------- ilişkiler */
         function warOf(a, b) { for (const w of S.wars) if ((w[0] === a && w[1] === b) || (w[0] === b && w[1] === a)) return w; return null; }
         function isAlly(a, b) { for (const k of S.allies) if ((k[0] === a && k[1] === b) || (k[0] === b && k[1] === a)) return true; return false; }
+        function lockBetween(a, b) { for (const l of S.locks) if (((l[0] === a && l[1] === b) || (l[0] === b && l[1] === a)) && l[3] > S.round) return l; return null; }
         function relation(a, b) {
             if (isAlly(a, b)) return 'ally';
             const w = warOf(a, b);
             if (w) return w[3] ? 'war' : 'pending';
             return 'peace';
         }
+        const myQueued = () => { const s = new Set(); for (const [i, pid] of S.pending) if (pid === S.me) s.add(i); return s; };
         const clientView = {
             get grid() { return S.grid; },
             activeWar: (a, b) => { const w = warOf(a, b); return !!(w && w[3]); },
             pendingWar: (a, b) => { const w = warOf(a, b); return !!(w && !w[3]); },
-            isAlly: (a, b) => isAlly(a, b)
+            isAlly: (a, b) => isAlly(a, b),
+            extraOwned: (i) => S.pending.get(i) === S.me,
+            get protectedNow() { return S.phase === 'PLAYING' && S.round <= protRounds(); },
+            get navalOpen() { return navalOpenNow(); }
         };
+        function navalOpenNow() { return S.phase === 'PLAYING' && Date.now() >= S.navalAt; }
+        function syncNaval(m) {   // sunucudan gelen kalan kilit süresi (ms); eski sunucuda alan yoksa açık say
+            S.navalAt = (m.nv === undefined) ? 0 : (m.nv < 0 ? Infinity : Date.now() + m.nv);
+            if (S.phase !== 'PLAYING') S.navToast = false;
+            else if (!S.navToast && navalOpenNow() && m.nv !== undefined) { S.navToast = true; if (typeof toast === 'function') toast('⚓ Deniz hareketi açıldı! Alınan deniz hücreleri 5 sn sonra geri döner.', 'ok', 4500); }
+        }
+        function protRounds() { return (S.cfg && S.cfg.WAR_PROTECTION_ROUNDS) || 5; }
 
-        /* ================================================== LOBİ ARAYÜZÜ === */
-        function initLobbyUI() {
+        /* ================================================== GİRİŞ / LOBİ === */
+        function initJoinForm() {
             $('nameInput').value = store('local', 'px_country') || '';
-            const metaUrl = metaWsUrl();
-            $('serverInput').value = metaUrl || store('local', 'px_server') || '';
-            const savedColor = store('local', 'px_color');
-            if (savedColor && /^#[0-9a-f]{6}$/i.test(savedColor)) selectedColor = savedColor.toLowerCase();
-            renderNationCards();
-            $('nameInput').addEventListener('input', updateJoinEnabled);
-            $('nameInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') confirmNationSelection(); });
-            $('customColor').addEventListener('input', (e) => { selectedColor = e.target.value.toLowerCase(); renderNationCards(); });
-            updateJoinEnabled();
-        }
-
-        function renderNationCards() {
-            const listContainer = $('nationSelectionList');
-            listContainer.innerHTML = "";
-            NATIONS.forEach((nation) => {
-                const taken = takenColors.some(c => PXCore.colorDistance(nation.color, c) < PXCore.CONFIG.COLOR_MIN_DISTANCE);
-                const card = document.createElement('div');
-                card.className = 'nation-card' + (selectedColor === nation.color ? ' selected' : '') + (taken ? ' taken' : '');
-                card.innerHTML = `
-                    <span style="font-size:7px;">${escapeHtml(nation.name)}</span>
-                    <div class="color-box" style="background-color: ${safeColor(nation.color)};"></div>
-                `;
-                if (!taken) card.onclick = () => selectNation(nation.color);
-                listContainer.appendChild(card);
-            });
-            updateJoinEnabled();
-        }
-
-        function selectNation(color) {
-            selectedColor = color;
-            $('customColor').value = color;
-            renderNationCards();
-        }
-        function updateJoinEnabled() {
-            $('joinGameBtn').disabled = !(ui === 'FORM' && selectedColor && $('nameInput').value.trim().length > 0);
+            $('serverInput').value = metaWsUrl() || store('local', 'px_server') || '';
+            const f = myFlagB64();
+            const cv = f ? flagCanvasFromB64(f) : defaultFlagCanvas('local');
+            $('joinFlagPreview').src = cv.toDataURL('image/png');
+            $('nameInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') joinFromForm(); });
         }
         function showLobbyError(t) { $('lobbyError').textContent = t || ''; }
 
-        function confirmNationSelection() {
+        function joinFromForm(auto) {
             if (ui !== 'FORM') return;
-            if (!selectedColor) return showLobbyError('Bir renk seç.');
-            const name = $('nameInput').value.trim();
-            if (!name) return showLobbyError('Ülke adını yaz.');
-            const url = $('serverInput').value.trim();
+            let name = $('nameInput').value.trim();
+            if (!name) name = store('local', 'px_country') || '';
+            if (!name) return showLobbyError('Ülke adını yaz (ana menüden de girebilirsin).');
+            let url = $('serverInput').value.trim();
+            if (auto) { const j = store('session', 'px_join'); try { const o = JSON.parse(j || '{}'); if (typeof o.url === 'string') url = o.url; if (typeof o.room === 'string') joinRoomId = o.room; if (o.mode === 'duel' || o.mode === 'lobby') joinMode = o.mode; } catch (e) { /* */ } }
             if (url && !validWsUrl(url)) return showLobbyError('Sunucu adresi ws:// veya wss:// ile başlamalı.');
             if (url && location.protocol === 'https:' && /^ws:\/\//i.test(url)) return showLobbyError('https sayfasından yalnızca wss:// kullanılabilir.');
-            store('local', 'px_country', name); store('local', 'px_color', selectedColor); store('local', 'px_server', url);
+            store('local', 'px_country', name); store('local', 'px_server', url);
             if (url) store('session', 'px_url', url);
-            connect({ t: 'join', name: name, color: selectedColor }, url, null);
+            const msg = { t: 'join', name: name };
+            const fl = myFlagB64(); if (fl) msg.flag = fl;
+            if (joinRoomId) msg.room = joinRoomId;
+            if (joinMode) msg.mode = joinMode;
+            joinRoomId = ''; joinMode = '';
+            connect(msg, url, null);
         }
 
         function showWaiting() {
@@ -2031,56 +2585,113 @@
             $('joinPanel').style.display = 'none';
             $('waitPanel').style.display = 'block';
             $('overOverlay').style.display = 'none';
+            buildWheel();
         }
+
+        /* ---------- RENK ÇARKI: 9 renk tonu x 3 halka + nötrler; MAVİ sektör yasak; alınan renk ✕ ---------- */
+        const WHEEL = { size: 280, cx: 140, cy: 140, radii: [112, 82, 52] };
+        function wheelPos(c) {
+            if (c.ring === 3) { const ang = (c.slot * 120 - 90) * Math.PI / 180; return [WHEEL.cx + 20 * Math.cos(ang), WHEEL.cy + 20 * Math.sin(ang)]; }
+            const ang = (c.hue - 90) * Math.PI / 180, r = WHEEL.radii[c.ring];
+            return [WHEEL.cx + r * Math.cos(ang), WHEEL.cy + r * Math.sin(ang)];
+        }
+        function buildWheel() {
+            const box = $('wheelBox');
+            if (box.getAttribute('data-built')) { updateWheel(); return; }
+            box.setAttribute('data-built', '1');
+            // yasak MAVİ sektör (hue 165°-255°): taramalı gri dilim + etiket
+            const a0 = (165 - 90) * Math.PI / 180, a1 = (255 - 90) * Math.PI / 180, R0 = 36, R1 = 132;
+            const pt = (a, r) => (WHEEL.cx + r * Math.cos(a)).toFixed(1) + ' ' + (WHEEL.cy + r * Math.sin(a)).toFixed(1);
+            const d = `M ${pt(a0, R0)} L ${pt(a0, R1)} A ${R1} ${R1} 0 0 1 ${pt(a1, R1)} L ${pt(a1, R0)} A ${R0} ${R0} 0 0 0 ${pt(a0, R0)} Z`;
+            const mid = (a0 + a1) / 2;
+            box.innerHTML = `<svg viewBox="0 0 280 280" width="280" height="280"><defs><pattern id="hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="8" height="8" fill="#1e293b"/><line x1="0" y1="0" x2="0" y2="8" stroke="#475569" stroke-width="4"/></pattern></defs>
+                <circle cx="140" cy="140" r="134" fill="#0b1220" stroke="#475569" stroke-width="2"/><path d="${d}" fill="url(#hatch)" stroke="#e74c3c" stroke-width="1"/>
+                <text x="${(WHEEL.cx + 84 * Math.cos(mid)).toFixed(1)}" y="${(WHEEL.cy + 84 * Math.sin(mid)).toFixed(1)}" fill="#e74c3c" font-size="8" text-anchor="middle" font-family="'Press Start 2P',monospace">MAVİ</text>
+                <text x="${(WHEEL.cx + 84 * Math.cos(mid)).toFixed(1)}" y="${(WHEEL.cy + 84 * Math.sin(mid) + 11).toFixed(1)}" fill="#e74c3c" font-size="8" text-anchor="middle" font-family="'Press Start 2P',monospace">YASAK</text></svg>`;
+            PALETTE.forEach((c) => {
+                const [x, y] = wheelPos(c);
+                const b = document.createElement('button');
+                b.className = 'sw'; b.setAttribute('data-hex', c.hex); b.style.left = x.toFixed(1) + 'px'; b.style.top = y.toFixed(1) + 'px';
+                b.style.background = safeColor(c.hex); b.title = c.hex.toUpperCase();
+                b.onclick = () => pickColor(c.hex);
+                box.appendChild(b);
+            });
+            updateWheel();
+        }
+        function updateWheel() {
+            const taken = new Map();
+            for (const p of S.players.values()) if (p.color) taken.set(p.color, p.id);
+            let mine = null;
+            document.querySelectorAll('#wheelBox .sw').forEach((b) => {
+                const hex = b.getAttribute('data-hex'), owner = taken.get(hex);
+                b.classList.toggle('taken', owner !== undefined && owner !== S.me);
+                b.classList.toggle('mine', owner === S.me);
+                if (owner === S.me) mine = hex;
+            });
+            $('wheelHint').textContent = mine ? '✔ Rengin seçildi. Başlangıçta seçmezsen otomatik atanır.' : 'Bir renk seç. (Seçmezsen otomatik bir renk atanır.)';
+        }
+        function pickColor(hex) {
+            for (const p of S.players.values()) if (p.color === hex && p.id !== S.me) return toastOnce('ct', 'Bu renk başka bir oyuncu tarafından seçildi.', 'bad', 1200);
+            Net.send({ t: 'color', color: hex });
+        }
+
         function renderWaiting() {
-            const min = S.min;
-            $('waitMode').textContent = S.mode === 'online' ? 'ÇEVRİMİÇİ — sunucu odası' : 'ÇEVRİMDIŞI — botlar lobiyi dolduruyor';
+            $('waitTitle').textContent = S.roomName ? S.roomName.toUpperCase() : 'LOBİ';
+            $('waitMode').textContent = (S.mode === 'online' ? 'ÇEVRİMİÇİ' : 'ÇEVRİMDIŞI') + ' — ' + S.n + '/' + S.max + ' oyuncu';
             if (S.countdown !== null) {
                 $('waitBig').textContent = S.countdown + 's';
-                $('waitHint').textContent = 'SAVAŞ BAŞLIYOR! Oyuncular: ' + S.n + '/' + S.max;
+                $('waitHint').textContent = 'SAVAŞ BAŞLIYOR! Renginizi seçin.';
             } else {
-                $('waitBig').textContent = S.n + '/' + min;
-                $('waitHint').textContent = 'En az ' + min + ' oyuncu gerekli. Oyuncu sayısı ' + min + "'a ulaşınca 20 saniyelik geri sayım başlar.";
+                $('waitBig').textContent = S.n + '/' + S.min;
+                const cdSec = (S.cfg && S.cfg.LOBBY_COUNTDOWN) || 20, noBots = !!(S.cfg && S.cfg.LOBBY_WAIT_SECONDS >= 1e6);
+                if (noBots) $('waitHint').textContent = (S.max === 2 ? 'RAKİP BEKLENİYOR… Rakip gelir gelmez ' + cdSec + ' sn geri sayım başlar, savaş hemen başlar. ' : S.min + ' oyuncuya ulaşınca ' + cdSec + ' sn geri sayım başlar. ') + 'Bu odada bot yoktur.';
+                else $('waitHint').textContent = S.min + ' oyuncuya ulaşınca ' + cdSec + ' sn geri sayım başlar. ' + S.wait + ' sn içinde ulaşılamazsa kalan yerler botlarla doldurulup oyun hemen başlar.';
             }
+            $('rosterLabel').textContent = 'OYUNCULAR (' + S.n + '/' + S.max + ')';
             const r = $('roster'); r.innerHTML = '';
-            Array.from(S.players.values()).forEach(p => {
+            Array.from(S.players.values()).forEach(p => {   // yalnızca bayrak + isim (renk yok)
                 const d = document.createElement('div');
                 d.className = 'roster-item' + (p.id === S.me ? ' me' : '');
-                d.innerHTML = `<div class="color-box" style="background-color:${safeColor(p.color)};"></div><span>${escapeHtml(p.name)}${p.bot ? ' 🤖' : ''}</span>`;
+                d.innerHTML = `${flagImg(p.id)}<span>${escapeHtml(p.name)}${p.bot ? ' 🤖' : ''}</span>`;
                 r.appendChild(d);
             });
+            updateWheel();
         }
 
         function backToForm(msg) {
             Net.stop();
             store('session', 'px_token', null);
             ui = 'FORM';
-            S.me = 0; S.grid = null; S.players = new Map(); S.wars = []; S.allies = []; S.props = []; S.phase = 'LOBBY'; S.gift = null;
+            S.me = 0; S.grid = null; S.players = new Map(); S.wars = []; S.allies = []; S.props = []; S.locks = []; S.pending = new Map(); S.seaExpiries = new Map(); S.activeCaptures = new Map();
+            S.phase = 'LOBBY'; S.gift = null; S.capCand = -1; S.capBar = null;
             centeredOnCapital = false;
             exitGiftMode(true);
             closeAllWindows();
+            $('capitalPrompt').style.display = 'none'; $('captureBarWrap').style.display = 'none'; $('relocBtn').style.display = 'none'; S.relocating = false;
             $('overOverlay').style.display = 'none';
             $('lobbyOverlay').style.display = 'flex';
             $('joinPanel').style.display = 'block';
             $('waitPanel').style.display = 'none';
+            $('wheelBox').removeAttribute('data-built'); $('wheelBox').innerHTML = '';
             $('netBanner').style.display = 'none';
             $('newspaperChatMessages').innerHTML = '';
+            $('joinGameBtn').disabled = false;
             private1v1Logs = {}; unreadMessages = {};
             showLobbyError(msg || '');
-            updateJoinEnabled();
         }
-        function leaveToMenu() { backToForm(''); }
+        function leaveToMenu() { Net.stop(); store('session', 'px_token', null); location.href = 'index.html'; }
 
         function enterGame() {
             ui = 'GAME';
             $('lobbyOverlay').style.display = 'none';
             $('overOverlay').style.display = 'none';
             centeredOnCapital = false;
-            scale = 1.2;
+            scale = isMobileLayout() ? Math.max(0.35, Math.min(1.2, window.innerWidth / (COLS * gridSize) * 1.8)) : 1.2;
             offsetX = (window.innerWidth - COLS * gridSize * scale) / 2;
-            offsetY = 60;
+            offsetY = isMobileLayout() ? 70 : 60;
+            if (isMobileLayout() && !$('leftNewspaperChat').classList.contains('collapsed')) toggleNews();   // küçük ekranda haber paneli kapalı başlar
             clampCamera();
-            frontDirty = true;
+            frontDirty = true; borderDirty = true;
         }
 
         /* ===================================================== HARİTA ======= */
@@ -2099,20 +2710,26 @@
             let c = colorCache.get(id);
             if (!c) {
                 const p = S.players.get(id);
-                const hex = p ? safeColor(p.color) : '#ffffff';
+                const hex = p && p.color ? safeColor(p.color) : '#ffffff';
                 c = [parseInt(hex.substr(1, 2), 16), parseInt(hex.substr(3, 2), 16), parseInt(hex.substr(5, 2), 16)];
                 colorCache.set(id, c);
             }
             return c;
         }
+        function darkRgbOfOwner(id) {   // başkent hücresi: oyuncu renginin %30 daha koyu tonu
+            const k = 'd' + id; let c = colorCache.get(k);
+            if (!c) { const b = rgbOfOwner(id); c = [Math.round(b[0] * 0.7), Math.round(b[1] * 0.7), Math.round(b[2] * 0.7)]; colorCache.set(k, c); }
+            return c;
+        }
+        function isCapitalCell(idx, owner) { const p = S.players.get(owner); return !!p && p.cap === idx; }
         function paintPx(idx) {
             const v = S.grid ? S.grid[idx] : (LAND_MASK[idx] ? -1 : 0);
             let rgb;
             if (LAND_MASK[idx]) {
-                rgb = v > 0 ? rgbOfOwner(v) : LAND_RGB;
+                rgb = v > 0 ? (isCapitalCell(idx, v) ? darkRgbOfOwner(v) : rgbOfOwner(v)) : LAND_RGB;
             } else if (v > 0) {
-                const o = rgbOfOwner(v); // deniz üstünde şeffaf (geçici) işgal
-                rgb = [SEA_RGB[0] * 0.6 + o[0] * 0.4, SEA_RGB[1] * 0.6 + o[1] * 0.4, SEA_RGB[2] * 0.6 + o[2] * 0.4];
+                const o = rgbOfOwner(v); // deniz köprüsü: %50 şeffaf oyuncu rengi
+                rgb = [SEA_RGB[0] * 0.5 + o[0] * 0.5, SEA_RGB[1] * 0.5 + o[1] * 0.5, SEA_RGB[2] * 0.5 + o[2] * 0.5];
             } else rgb = SEA_RGB;
             const o4 = idx * 4;
             mapImg.data[o4] = rgb[0]; mapImg.data[o4 + 1] = rgb[1]; mapImg.data[o4 + 2] = rgb[2]; mapImg.data[o4 + 3] = 255;
@@ -2122,11 +2739,16 @@
             if (!S.grid || !Array.isArray(list)) return;
             for (const c of list) {
                 const idx = c[0];
-                if (idx >= 0 && idx < N) { S.grid[idx] = c[1]; paintPx(idx); }
+                if (idx >= 0 && idx < N) {
+                    S.grid[idx] = c[1]; S.pending.delete(idx);
+                    for (const [pid, activeIdx] of S.activeCaptures) if (activeIdx === idx) S.activeCaptures.delete(pid);
+                    if (c[1] === 0 || LAND_MASK[idx]) S.seaExpiries.delete(idx);
+                    paintPx(idx);
+                }
             }
             mapDirty = true; frontDirty = true; borderDirty = true;
         }
-        // ülke sınırları: farklı sahipli komşu kara hücreleri arasına ince koyu çizgi (mavi ülke denizle karışmasın)
+        // ülke sınırları: farklı sahipli komşu kara hücreleri arasına ince koyu çizgi
         function buildBorders() {
             borderDirty = false;
             const path = new Path2D();
@@ -2176,20 +2798,44 @@
         }
 
         let hoverIdx = -1;
-        function drawStar(cx, cy, R) {
-            ctx.beginPath();
-            for (let i = 0; i < 10; i++) {
-                const ang = -Math.PI / 2 + i * Math.PI / 5, rad = i % 2 ? R * 0.45 : R;
-                ctx.lineTo(cx + Math.cos(ang) * rad, cy + Math.sin(ang) * rad);
+        function cellXY(i) { return [(i % COLS) * gridSize, Math.floor(i / COLS) * gridSize]; }
+
+        // BAŞKENT BAYRAĞI: özel bayrak, başkentin tam üstünde direkte dalgalanır (oran 2:1 = 30x15)
+        function drawCapitalFlags(ts) {
+            ctx.imageSmoothingEnabled = false;
+            for (const p of S.players.values()) {
+                if (!p.alive || p.cap < 0 || S.grid[p.cap] !== p.id) continue;
+                const [x, y] = cellXY(p.cap);
+                const cx = x + gridSize / 2, fw = gridSize * 2.4, fh = fw / 2, top = y - fh - gridSize * 0.4;
+                const wave = Math.sin((ts || 0) / 400 + p.id) * 0.8;
+                ctx.strokeStyle = '#000'; ctx.lineWidth = 1.6;
+                ctx.beginPath(); ctx.moveTo(cx, y + gridSize * 0.7); ctx.lineTo(cx, top - 1); ctx.stroke();
+                ctx.drawImage(flagFor(p.id).canvas, cx + 0.8, top + wave, fw, fh);
+                ctx.strokeStyle = '#000'; ctx.lineWidth = 1; ctx.strokeRect(cx + 0.8, top + wave, fw, fh);
             }
-            ctx.closePath();
-            ctx.fillStyle = '#fff'; ctx.fill();
-            ctx.lineWidth = 1; ctx.strokeStyle = '#000'; ctx.stroke();
+        }
+
+        // FETİH ŞERİTİ: fethedilmekte olan piksel, ülke renginde animasyonlu çizgili görünür
+        function drawPending(ts) {
+            if (!S.pending.size) return;
+            const phase = ((ts || 0) / 45) % 8;
+            for (const [i, pid] of S.pending) {
+                if (S.activeCaptures.get(pid) !== i) continue;
+                const [x, y] = cellXY(i);
+                const o = rgbOfOwner(pid), col = `rgb(${o[0]},${o[1]},${o[2]})`;
+                ctx.fillStyle = `rgba(${o[0]},${o[1]},${o[2]},0.28)`; ctx.fillRect(x, y, gridSize, gridSize);
+                ctx.save(); ctx.beginPath(); ctx.rect(x, y, gridSize, gridSize); ctx.clip();
+                ctx.strokeStyle = col; ctx.lineWidth = 2.6;
+                ctx.beginPath();
+                for (let k = -gridSize; k < gridSize * 2; k += 8) { ctx.moveTo(x + k + phase, y + gridSize); ctx.lineTo(x + k + phase + gridSize, y); }
+                ctx.stroke(); ctx.restore();
+            }
         }
 
         function drawMap(ts) {
             requestAnimationFrame(drawMap);
             ctx.clearRect(0, 0, canvas.width, canvas.height);
+            updateCaptureBar();
             if (ui !== 'GAME' || !S.grid) return;
             if (mapDirty) { mapCtx.putImageData(mapImg, 0, 0); mapDirty = false; }
             if (frontDirty) recomputeFront();
@@ -2207,24 +2853,75 @@
             if (frontCells.length) {
                 const a = 0.25 + 0.2 * Math.sin((ts || 0) / 250);
                 ctx.fillStyle = `rgba(255, 40, 40, ${a})`;
-                for (const i of frontCells) ctx.fillRect((i % COLS) * gridSize, Math.floor(i / COLS) * gridSize, gridSize, gridSize);
+                for (const i of frontCells) { const [x, y] = cellXY(i); ctx.fillRect(x, y, gridSize, gridSize); }
             }
-            // Başkentler
-            for (const p of S.players.values()) {
-                if (p.alive && p.cap >= 0 && S.grid[p.cap] === p.id) {
-                    drawStar((p.cap % COLS) * gridSize + gridSize / 2, Math.floor(p.cap / COLS) * gridSize + gridSize / 2, gridSize * 0.62);
-                }
+            drawPending(ts);
+            drawCapitalFlags(ts);
+            // başkent adayı: YEŞİL kenarlık
+            if (S.capCand >= 0) {
+                const [x, y] = cellXY(S.capCand);
+                ctx.strokeStyle = '#2ecc71'; ctx.lineWidth = 3.2 / Math.min(scale, 2);
+                ctx.strokeRect(x + 0.5, y + 0.5, gridSize - 1, gridSize - 1);
+                ctx.strokeStyle = '#fff'; ctx.lineWidth = 1 / Math.min(scale, 2); ctx.strokeRect(x - 1.5, y - 1.5, gridSize + 3, gridSize + 3);
             }
             // Fare üstü: yapılabilir mi?
             if (hoverIdx >= 0 && !isDragging) {
                 let col = '#ffffff';
-                if (S.gift) col = (S.grid[hoverIdx] === S.me && LAND_MASK[hoverIdx] && hoverIdx !== S.you.capital) ? '#e84393' : '#555';
+                if (capSelectActive()) col = capCellValid(hoverIdx) ? '#2ecc71' : '#e74c3c';
+                else if (S.gift) col = (S.grid[hoverIdx] === S.me && LAND_MASK[hoverIdx] && hoverIdx !== S.you.capital && (giftPicked.has(hoverIdx) || PXCore.adjacentOwned(S.grid, hoverIdx, S.gift.to))) ? '#e84393' : '#555';
                 else if (S.phase === 'PLAYING') col = PXCore.captureCheck(clientView, S.me, hoverIdx).ok ? '#2ecc71' : '#e74c3c';
-                else if (S.phase === 'SETUP') col = (LAND_MASK[hoverIdx] && S.grid[hoverIdx] === -1) ? '#2ecc71' : '#e74c3c';
+                else if (S.phase === 'SETUP') col = (LAND_MASK[hoverIdx] && S.grid[hoverIdx] === -1 && PXCore.adjacentOwned(S.grid, hoverIdx, S.me)) ? '#2ecc71' : '#e74c3c';
+                const [x, y] = cellXY(hoverIdx);
                 ctx.strokeStyle = col; ctx.lineWidth = 2 / scale;
-                ctx.strokeRect((hoverIdx % COLS) * gridSize, Math.floor(hoverIdx / COLS) * gridSize, gridSize, gridSize);
+                ctx.strokeRect(x, y, gridSize, gridSize);
             }
             ctx.restore();
+        }
+
+        // alt ekran fetih çubuğu: kuyruktaki başın ilerlemesi (0.5-1.0 sn), %100'de piksel katılaşır
+        function updateCaptureBar() {
+            const wrap = $('captureBarWrap');
+            const show = ui === 'GAME' && S.phase === 'PLAYING' && S.you.alive && (S.you.queue > 0 || S.capBar);
+            wrap.style.display = show ? 'block' : 'none';
+            if (!show) return;
+            let pct = 0;
+            if (S.capBar) pct = Math.max(0, Math.min(1, (performance.now() - S.capBar.start) / S.capBar.ms));
+            $('captureBar').style.width = (pct * 100).toFixed(0) + '%';
+            $('captureLabel').textContent = 'FETİH %' + (pct * 100).toFixed(0) + ' · kuyruk: ' + S.you.queue;
+        }
+
+        /* ================================================ BAŞKENT SEÇİMİ ==== */
+        function capSelectActive() {
+            if (ui !== 'GAME' || !S.you.alive) return false;
+            return (S.phase === 'SETUP' && S.you.capital < 0) || (S.phase === 'PLAYING' && S.you.needCap && S.you.capDue > 0) || (S.phase === 'PLAYING' && S.relocating);
+        }
+        function capCellValid(idx) {
+            if (!S.grid || !LAND_MASK[idx]) return false;
+            if (S.phase === 'SETUP') return S.grid[idx] === -1;
+            return S.grid[idx] === S.me && !(S.relocating && idx === S.you.capital);
+        }
+        function syncCapSelect() {
+            if (!capSelectActive()) { S.capCand = -1; S.relocating = false; $('capitalPrompt').style.display = 'none'; }
+        }
+        function pickCapitalCandidate(idx) {
+            if (!capCellValid(idx)) return toastOnce('capbad', S.phase === 'SETUP' ? 'Başkent için boş bir kara parçası seç.' : 'Yeni başkent için kendi karalarından birini seç.', 'bad', 1200);
+            S.capCand = idx;                       // yeşil kenarlık + alt onay çubuğu (kesinleşmez)
+            $('capitalPromptText').textContent = S.relocating ? 'Bayrak buraya taşınsın mı? Bedel: −2 puan (Evet / Hayır)' : 'Bu başkenti onaylıyor musunuz? (Evet / Hayır)';
+            $('capitalPrompt').style.display = 'flex';
+        }
+        function toggleRelocate() {
+            if (ui !== 'GAME' || S.phase !== 'PLAYING' || !S.you.alive || S.you.needCap) return;
+            if (S.relocating) { S.relocating = false; S.capCand = -1; $('capitalPrompt').style.display = 'none'; return updateHud(); }
+            exitGiftMode(true);
+            S.relocating = true;
+            toast('🚩 Bayrağı taşımak için kendi pikselini seç (bedel: −2 puan).', 'ok', 4000);
+            updateHud();
+        }
+        function capitalAnswer(yes) {
+            if (yes && S.capCand >= 0) Net.send({ t: 'capital', idx: S.capCand });
+            S.relocating = false;
+            S.capCand = -1;
+            $('capitalPrompt').style.display = 'none';
         }
 
         /* ================================================ GİRDİ (fare) ====== */
@@ -2242,13 +2939,13 @@
                 isPainting = true;
                 handleGridInteraction(e, true);
             }
-            if (e.button === 2 || !brushMode) { // Sağ tık veya fırça kapalıysa sürükleme yap
+            if (e.button === 2 || !brushMode || capSelectActive()) { // sağ tık / tek-tık modu: sürükleyerek gezin
                 isDragging = true;
                 startX = e.clientX - offsetX;
                 startY = e.clientY - offsetY;
             }
         });
-        canvas.addEventListener('contextmenu', e => e.preventDefault()); // Sağ tık menüsünü kapat
+        canvas.addEventListener('contextmenu', e => e.preventDefault());
 
         window.addEventListener('mousemove', e => {
             if (isDragging) {
@@ -2268,22 +2965,69 @@
             flushQueue();
         });
 
+        const isMobileLayout = () => window.PX_LAYOUT === 'mobile';
+        const minScale = () => (isMobileLayout() ? 0.3 : 0.6);   // telefonda tüm haritayı görebilmek için daha uzak zoom
         canvas.addEventListener('wheel', e => {
             e.preventDefault();
             const zoomIn = e.deltaY < 0;
-            const newScale = Math.max(0.6, Math.min(4, zoomIn ? scale * 1.1 : scale / 1.1));
-            const k = newScale / scale; // imleç altındaki nokta sabit kalsın
+            const newScale = Math.max(minScale(), Math.min(4, zoomIn ? scale * 1.1 : scale / 1.1));
+            const k = newScale / scale;
             offsetX = e.clientX - (e.clientX - offsetX) * k;
             offsetY = e.clientY - (e.clientY - offsetY) * k;
             scale = newScale;
             clampCamera();
         }, { passive: false });
 
+        /* ---- DOKUNMATİK: 1 parmak = fırça/tek tık (fare sol tık ile aynı), 2 parmak = kaydır + sıkıştırarak yakınlaştır ---- */
+        let pinch = null, touchLocked = false;
+        const tPt = (t) => ({ clientX: t.clientX, clientY: t.clientY, target: canvas });
+        canvas.addEventListener('touchstart', e => {
+            e.preventDefault();
+            if (e.touches.length >= 2) {
+                isPainting = false; isDragging = false; lastCell = -1; flushQueue(); touchLocked = true;
+                const a = e.touches[0], b = e.touches[1];
+                pinch = { d: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY) || 1, cx: (a.clientX + b.clientX) / 2, cy: (a.clientY + b.clientY) / 2 };
+                return;
+            }
+            if (touchLocked) return;
+            const t = e.touches[0], pe = tPt(t);
+            isPainting = true; handleGridInteraction(pe, true);
+            if (!brushMode || capSelectActive()) { isDragging = true; startX = t.clientX - offsetX; startY = t.clientY - offsetY; }
+            hoverIdx = cellFromEvent(pe);
+        }, { passive: false });
+        canvas.addEventListener('touchmove', e => {
+            e.preventDefault();
+            if (e.touches.length >= 2 && pinch) {
+                const a = e.touches[0], b = e.touches[1];
+                const d = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY) || 1, cx = (a.clientX + b.clientX) / 2, cy = (a.clientY + b.clientY) / 2;
+                offsetX += cx - pinch.cx; offsetY += cy - pinch.cy;
+                const ns = Math.max(minScale(), Math.min(4, scale * d / pinch.d)), k = ns / scale;
+                offsetX = cx - (cx - offsetX) * k; offsetY = cy - (cy - offsetY) * k; scale = ns;
+                pinch.d = d; pinch.cx = cx; pinch.cy = cy;
+                clampCamera(); return;
+            }
+            if (touchLocked || !e.touches.length) return;
+            const t = e.touches[0];
+            if (isDragging) { offsetX = t.clientX - startX; offsetY = t.clientY - startY; clampCamera(); }
+            else if (isPainting && brushMode) handleGridInteraction(tPt(t), false);
+        }, { passive: false });
+        const touchEnd = (e) => {
+            e.preventDefault();
+            if (e.touches.length === 0) { isDragging = false; isPainting = false; lastCell = -1; pinch = null; touchLocked = false; hoverIdx = -1; flushQueue(); }
+            else if (e.touches.length === 1) pinch = null;   // parmak kalktı: tüm parmaklar kalkana dek boyama yok
+        };
+        canvas.addEventListener('touchend', touchEnd, { passive: false });
+        canvas.addEventListener('touchcancel', touchEnd, { passive: false });
+
+        // görünüm düğmesi etiketi (oyun içi alt menü)
+        function updateLayoutBtn() { const b = document.getElementById('layoutSubBtn'); if (b) b.textContent = 'GÖRÜNÜM: ' + (window.PX_LAYOUT === 'mobile' ? 'MASAÜSTÜNE GEÇ' : 'MOBİLE GEÇ'); }
+        window.addEventListener('pxlayout', updateLayoutBtn);
+
         window.addEventListener('resize', () => {
             canvas.width = window.innerWidth; canvas.height = window.innerHeight; clampCamera();
         });
         window.addEventListener('keydown', e => {
-            if (e.key === 'Escape') { exitGiftMode(); closeAllWindows(); }
+            if (e.key === 'Escape') { exitGiftMode(); closeAllWindows(); if (S.capCand >= 0) capitalAnswer(false); S.relocating = false; syncCapSelect(); updateHud(); }
         });
 
         let lastCell = -1;
@@ -2311,24 +3055,53 @@
             if (idx < 0) return;
             if (S.phase !== 'SETUP' && S.phase !== 'PLAYING') return;
             if (!S.you.alive) return toastOnce('dead', 'Ülken yok edildi; izleyicisin.', 'bad');
+            // başkent seçimi: tıklama KESİNLEŞTİRMEZ, adayı işaretler ve onay ister
+            if (capSelectActive()) { if (fresh) pickCapitalCandidate(idx); return; }
             const mode = S.gift ? 'gift' : 'paint';
-            if (outQueue.length && outMode !== mode) flushQueue();
+            if (outQueue.length && outMode !== mode) flushQueue(true);
             outMode = mode;
             if (!S.gift && S.phase === 'PLAYING') {
-                if (S.you.ended) return toastOnce('ended', 'Turu bitirdin; yeni turu bekle.', 'bad');
-                if (S.you.actions <= 0) return toastOnce('noact', 'Bu tur için piksel hakkın bitti.', 'bad');
+                if (S.you.points < 0) return toastOnce('nopts', 'Borcun var (' + S.you.points + '): borç ödenene kadar genişleme kilitli.', 'bad');
+                if (S.you.points <= 0) return toastOnce('nopts', 'Genişleme puanın bitti. Yeni zar için turu bekle.', 'bad');
             }
-            if (!S.gift && S.phase === 'SETUP' && S.you.capital >= 0 && S.you.pool <= 0) return toastOnce('nopool', 'Yerleştirecek pikselin kalmadı.', 'bad');
+            if (!S.gift && S.phase === 'SETUP') {
+                if (S.you.capital < 0) return toastOnce('nocap', 'Önce başkentini seç ve onayla.', 'bad');
+                if (S.you.pool <= 0) return toastOnce('nopool', 'Yerleştirecek pikselin kalmadı.', 'bad');
+            }
             const cells = (!fresh && brushMode && lastCell >= 0 && lastCell !== idx) ? lineCells(lastCell, idx) : [idx];
             lastCell = idx;
+            if (S.gift) {
+                for (const c of cells) pickGiftCell(c);
+                updateGiftBarText();
+                return;
+            }
             for (const c of cells) {
-                if (S.gift) { if (S.grid[c] === S.me && LAND_MASK[c] && c !== S.you.capital) outQueue.push(c); }
-                else if (S.grid[c] !== S.me) outQueue.push(c);
+                if (!LAND_MASK[c] && !(S.phase === 'PLAYING' && navalOpenNow())) continue;   // kurulumda ve ilk 5 sn deniz seçilemez
+                if (S.grid[c] !== S.me && !(S.pending.get(c) === S.me)) outQueue.push(c);
             }
             if (outQueue.length && !flushTimer) flushTimer = setTimeout(flushQueue, 45);
         }
 
-        function flushQueue() {
+        /* toprak devri: en fazla 3 piksel, alıcıya komşu sınırdan; GÖNDER ile tek seferde yollanır */
+        const giftPicked = new Set();
+        function giftMax() { return (S.cfg && S.cfg.GIFT_MAX_CELLS) || 3; }
+        function pickGiftCell(c) {
+            if (giftPicked.has(c) || !S.gift) return;
+            if (!LAND_MASK[c] || S.grid[c] !== S.me) return;
+            if (c === S.you.capital) return toastOnce('capgift', 'Başkent hiçbir diplomatik işlemle devredilemez.', 'bad', 1500);
+            if (giftPicked.size >= giftMax()) return toastOnce('giftmax', 'Tek seferde en fazla ' + giftMax() + ' piksel devredilebilir.', 'bad', 1500);
+            const linked = PXCore.adjacentOwned(S.grid, c, S.gift.to) || PXCore.anyNeighbor(c, (n) => giftPicked.has(n));
+            if (!linked) return toastOnce('giftadj', 'Yalnızca alıcının topraklarına komşu sınır pikselleri devredilebilir.', 'bad', 1500);
+            giftPicked.add(c); outQueue.push(c);
+        }
+        function updateGiftBarText() {
+            if (!S.gift) return;
+            const t = pl(S.gift.to);
+            $('giftBarText').textContent = `PİKSEL VER → ${t ? t.name : '?'} : sınırdaki piksellerini seç (${giftPicked.size}/${giftMax()}) · başkent devredilemez · sonra ${(S.cfg && S.cfg.GIFT_COOLDOWN_ROUNDS) || 5} tur bekleme`;
+        }
+
+        function flushQueue(force) {
+            if (outMode === 'gift' && S.gift && !force) return;    // devir: GÖNDER'e basana kadar bekle
             if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
             if (!outQueue.length) return;
             const seen = new Set(), list = [];
@@ -2348,10 +3121,6 @@
             btn.innerHTML = brushMode ? "<span>🖌️</span> MOD: FIRÇA" : "<span>🖱️</span> MOD: TEK TIK";
         }
 
-        function forceEndTurn() {
-            if (S.phase === 'PLAYING' && S.you.alive && !S.you.ended) Net.send({ t: 'end' });
-        }
-
         /* ===================================================== HUD ========= */
         function updateHud() {
             if (ui !== 'GAME') return;
@@ -2361,25 +3130,37 @@
             if (S.phase === 'SETUP') {
                 phaseTxt = `İLK YERLEŞİM: ${S.timer}s`;
                 infoTxt = `KALAN PİKSEL: ${you.pool}`;
-                status = you.capital < 0 ? 'Haritadan başkentini seçmek için kara parçasına tıkla!' : (you.pool > 0 ? 'Başkent kuruldu! Kalan piksellerini yerleştir.' : 'Yerleşim tamam. Diğerleri bekleniyor…');
+                status = you.capital < 0 ? 'Başkent için bir kara parçasına tıkla, sonra onayla!' : (you.pool > 0 ? 'Başkent kuruldu! Kalan piksellerini yerleştir.' : 'Yerleşim tamam. Diğerleri bekleniyor…');
             } else if (S.phase === 'PLAYING') {
-                phaseTxt = `TUR ${S.round}`;
-                infoTxt = `HAKKINIZ: ${you.actions} | PİKSEL: ${px}`;
+                phaseTxt = `TUR ${S.round} · ZAR: ${S.timer}s` + (S.round <= protRounds() ? ' · 🛡 KORUMA' : '') + ((isFinite(S.navalAt) && !navalOpenNow()) ? ` · ⚓ ${Math.max(1, Math.ceil((S.navalAt - Date.now()) / 1000))}s` : '');
+                infoTxt = `PUAN: ${you.points} | PİKSEL: ${px} | HIZ: ${PXCore.expansionRate(px)}/sn | KUYRUK: ${you.queue}`;
                 if (!you.alive) status = 'Ülken yok edildi. İzleyicisin.';
-                else if (you.ended) status = 'Turu bitirdin. Diğer oyuncular bekleniyor…';
-                else status = 'Turun aktif! Topraklarını genişlet.';
+                else if (you.needCap && you.capDue > 0) status = `Yeni başkent seç! Kalan süre: ${you.capDue}s`;
+                else if (you.needCap) status = 'Başkent düştü. Savaş bitince (barış) yenisini seçeceksin.';
+                else if (you.points < 0) status = `BORÇ ${you.points}: borç ödenene kadar genişleme kilitli. Yeni zarı bekle.`;
+                else status = you.points > 0 ? 'Komşu piksellere tıkla/sürükle: fetih başlar (deniz: oyun başından 5 sn sonra, geçici).' : 'Puan bitti. Sonraki zarı bekle.';
             } else if (S.phase === 'ENDED') {
                 phaseTxt = 'OYUN BİTTİ'; infoTxt = `PİKSEL: ${px}`; status = 'Oyun sona erdi.';
             }
-            if (S.gift) { const t = pl(S.gift.to); status = `PİKSEL VERME → ${t ? t.name : '?'}: kendi pikselinize tıkla/sürükle.`; }
+            if (S.gift) { const t = pl(S.gift.to); status = `PİKSEL VERME → ${t ? t.name : '?'}: sınırdaki piksellerinizi seçin, GÖNDER'e basın.`; }
+            if (S.relocating) status = '🚩 Bayrağı taşımak istediğin kendi pikselini seç (−2 puan).';
             $('phaseInfo').textContent = phaseTxt;
             $('playerInfo').textContent = infoTxt;
             $('turnStatus').textContent = status;
             $('turnTimer').textContent = (S.phase === 'SETUP' || S.phase === 'PLAYING') ? `${S.timer}s` : '';
-            $('endTurnBtn').disabled = !(S.phase === 'PLAYING' && you.alive && !you.ended);
-            if (S.phase === 'PLAYING') {
-                $('dice1').textContent = you.dice[0] || '?'; $('dice2').textContent = you.dice[1] || '?';
-            } else { $('dice1').textContent = '?'; $('dice2').textContent = '?'; }
+            $('ptsVal').textContent = S.phase === 'PLAYING' ? you.points : '-';
+            $('ptsVal').style.color = (S.phase === 'PLAYING' && you.points < 0) ? '#e74c3c' : '#fff';
+            const rb = $('relocBtn');
+            const canReloc = S.phase === 'PLAYING' && you.alive && !you.needCap && you.capital >= 0;
+            rb.style.display = canReloc ? 'flex' : 'none';
+            if (canReloc) {
+                const atWar = S.wars.some(w => w[3] && (w[0] === S.me || w[1] === S.me));
+                rb.disabled = !S.relocating && (atWar || you.points < 0 || !!S.gift);
+                rb.title = atWar ? 'Savaş sürerken başkent taşınamaz' : (you.points < 0 ? 'Borcun varken başkent taşınamaz' : 'Bayrağı kendi pikselinden birine taşı (−2 puan)');
+                rb.textContent = S.relocating ? '✖ İPTAL' : '🚩 BAŞKENT TAŞI (−2)';
+            }
+            if (S.phase === 'PLAYING') { $('dice1').textContent = you.dice[0] || '?'; $('dice2').textContent = you.dice[1] || '?'; }
+            else { $('dice1').textContent = '?'; $('dice2').textContent = '?'; }
             updateWarInfo();
             if (S.phase === 'ENDED') exitGiftMode(true);
         }
@@ -2400,31 +3181,32 @@
         }
 
         /* ============================================ GAZETE / SOHBET ====== */
+        const NEWS_LIMIT = 50; // bellek şişmesin: son 50 kayıt
         function addLine(div) {
             const box = $('newspaperChatMessages');
             box.appendChild(div);
-            while (box.children.length > 80) box.removeChild(box.firstChild);
+            while (box.children.length > NEWS_LIMIT) box.removeChild(box.firstChild);
             box.scrollTop = box.scrollHeight;
         }
-        function addNews(text, kind) {
+        function toggleNews() {
+            const p = $('leftNewspaperChat'); p.classList.toggle('collapsed');
+            $('newsToggle').textContent = p.classList.contains('collapsed') ? '▲' : '▼';
+        }
+        // satır: [bayrak] [isim]: .......... sağa yaslı duyuru metni  (renk yok; yalnızca isim + özel bayrak)
+        function newsRow(kindCls, flagsHtml, nameHtml, text) {
             const d = document.createElement('div');
-            d.className = 'chat-msg news ' + (['war', 'peace', 'ally'].includes(kind) ? kind : '');
-            d.textContent = text;
-            addLine(d);
+            d.className = 'news-item ' + kindCls;
+            d.innerHTML = `<div class="who">${flagsHtml}</div>${nameHtml ? `<div class="nm">${nameHtml}:</div>` : ''}<div class="tx">${escapeHtml(text)}</div>`;
+            return d;
+        }
+        function addNews(text, kind, who) {
+            const ids = (who || []).filter(id => pl(id)).slice(0, 2);
+            addLine(newsRow(['war', 'peace', 'ally'].includes(kind) ? kind : '', ids.map(flagImg).join(''), '', text));
             if (kind === 'war' && ui === 'GAME') toastOnce('news_' + text.slice(0, 20), text, 'war', 800);
         }
         function onChat(m) {
             const p = pl(m.from);
-            const d = document.createElement('div');
-            d.className = 'chat-msg';
-            d.style.background = 'rgba(30, 41, 59, 0.6)';
-            d.innerHTML = `
-                <div class="msg-line">
-                    <div class="flag-box" style="background-color: ${safeColor(p ? p.color : '#f39c12')};"></div>
-                    <span style="color: ${safeColor(p ? p.color : '#f39c12')};">${escapeHtml(p ? p.name : '?')}:</span>
-                </div>
-                <div style="margin-top:4px;">${escapeHtml(m.text)}</div>`;
-            addLine(d);
+            addLine(newsRow('', p ? flagImg(p.id) : '', p ? escapeHtml(p.name) : '?', m.text));
         }
         function onDm(m) {
             const partner = m.from === S.me ? m.to : m.from;
@@ -2436,11 +3218,30 @@
             }
             render1v1Messages(); refreshDiplomacyList(); updateBadges();
         }
+
+        /* ---------- oyun sonu: sıralama + SAVAŞ DENEYİMİ ---------- */
         function onOver(m) {
             exitGiftMode(true);
+            if (S.capCand >= 0) capitalAnswer(false);
             const names = (m.winners || []).map(id => (pl(id) || {}).name).filter(Boolean);
             $('overWinner').textContent = names.length ? 'KAZANAN: ' + names.join(', ') : 'KAZANAN YOK';
             $('overReason').textContent = m.reason || '';
+            const t = $('overTable'); t.innerHTML = '';
+            let myExp = 0;
+            (m.rank || []).forEach((r, i) => {
+                const p = pl(r.id); if (!p) return;
+                const row = document.createElement('div');
+                row.className = 'rank-row' + (r.id === S.me ? ' me' : '') + (i === 0 ? ' top' : '');
+                row.innerHTML = `<span>${i + 1}.</span>${flagImg(r.id)}<span>${escapeHtml(p.name)}${p.bot ? ' 🤖' : ''}</span><span>${r.px} px</span><span style="color:#f1c40f;">${r.exp ? '+' + r.exp + ' EXP' : '—'}</span>`;
+                t.appendChild(row);
+                if (r.id === S.me) myExp = r.exp;
+            });
+            // EXP yalnızca bir kez eklenir (maç numarasına göre) — yerel kayıt; hesap sistemi yok
+            let total = parseInt(store('local', 'px_exp') || '0', 10) || 0;
+            if (m.match && store('local', 'px_exp_match') !== m.match) {
+                total += myExp; store('local', 'px_exp', String(total)); store('local', 'px_exp_match', m.match);
+            }
+            $('overExp').textContent = 'SAVAŞ DENEYİMİ: ' + (myExp ? '+' + myExp : '+0') + '  (toplam ' + total + ')';
             $('overOverlay').style.display = 'flex';
         }
 
@@ -2451,22 +3252,8 @@
             if (!text || ui !== 'GAME') return;
             Net.send({ t: 'chat', text: text });
             input.value = "";
-            canChatGazette = false;
-            let cooldown = 4;
-            const btn = $('gazetteSendBtn');
-            btn.disabled = true;
-            let interval = setInterval(() => {
-                cooldown--;
-                btn.innerText = `${cooldown}s`;
-                if (cooldown <= 0) {
-                    clearInterval(interval);
-                    canChatGazette = true;
-                    btn.disabled = false;
-                    btn.innerText = "GÖNDER";
-                }
-            }, 1000);
+            cooldownBtn($('gazetteSendBtn'), ((S.cfg && S.cfg.CHAT_COOLDOWN_MS) || 5000) / 1000, (v) => { canChatGazette = v; });
         }
-
         function send1v1Message() {
             if (!canChat1v1 || !active1v1Partner) return;
             const input = $('chat1v1Input');
@@ -2474,19 +3261,16 @@
             if (!text) return;
             Net.send({ t: 'dm', to: active1v1Partner.id, text: text });
             input.value = "";
-            canChat1v1 = false;
-            let cooldown = 4;
-            const btn = $('chat1v1SendBtn');
-            btn.disabled = true;
-            let interval = setInterval(() => {
-                cooldown--;
-                btn.innerText = `${cooldown}s`;
-                if (cooldown <= 0) {
-                    clearInterval(interval);
-                    canChat1v1 = true;
-                    btn.disabled = false;
-                    btn.innerText = "GÖNDER";
-                }
+            cooldownBtn($('chat1v1SendBtn'), ((S.cfg && S.cfg.DM_COOLDOWN_MS) || 3000) / 1000, (v) => { canChat1v1 = v; });
+        }
+        function cooldownBtn(btn, secs, setFlag) {
+            setFlag(false);
+            let left = Math.ceil(secs);
+            btn.disabled = true; btn.innerText = `${left}s`;
+            const iv = setInterval(() => {
+                left--;
+                if (left <= 0) { clearInterval(iv); setFlag(true); btn.disabled = false; btn.innerText = "GÖNDER"; }
+                else btn.innerText = `${left}s`;
             }, 1000);
         }
 
@@ -2495,19 +3279,16 @@
             const sub = $('subMenu');
             sub.style.display = (sub.style.display === 'flex') ? 'none' : 'flex';
         }
-
         function openWindow(windowId) {
             closeAllWindows();
             $(windowId).style.display = 'flex';
             if (windowId === 'diplomacyWindow') refreshDiplomacyList();
             updateBadges();
         }
-
         function closeWindow(windowId) {
             $(windowId).style.display = 'none';
             if (windowId === 'chat1v1Window') active1v1Partner = null;
         }
-
         function closeAllWindows() {
             $('gazetteWriteWindow').style.display = 'none';
             $('diplomacyWindow').style.display = 'none';
@@ -2516,7 +3297,6 @@
         }
 
         function myIncoming() { return S.props.filter(p => p.to === S.me); }
-
         function updateBadges() {
             const hasUnread = Object.values(unreadMessages).some(v => v === true);
             const any = hasUnread || myIncoming().length > 0;
@@ -2532,7 +3312,6 @@
             if (!container) return;
             container.innerHTML = "";
             const others = Array.from(S.players.values()).filter(p => p.id !== S.me).sort((a, b) => (b.alive - a.alive) || (b.px - a.px));
-            // gelen teklifler
             const inc = myIncoming();
             if (inc.length) {
                 const t = document.createElement('div'); t.className = 'section-title'; t.textContent = 'GELEN TEKLİFLER'; container.appendChild(t);
@@ -2543,12 +3322,12 @@
                 container.insertAdjacentHTML('beforeend', `<div style="font-size:7px; color:#888; text-align:center; padding-top:20px;">Sunucuda aktif başka ülke yok.</div>`);
                 return;
             }
-            others.forEach(p => {
+            others.forEach(p => {   // yalnızca bayrak + isim
                 const div = document.createElement('div');
                 div.className = 'country-item' + (p.alive ? '' : ' dead');
                 const hasUnread = unreadMessages[p.id] ? `<div class="badge-alert">!</div>` : '';
                 div.innerHTML = `
-                    <div class="flag-box" style="background-color: ${safeColor(p.color)};"></div>
+                    ${flagImg(p.id)}
                     <span>${escapeHtml(p.name)}${p.bot ? ' 🤖' : ''}</span>
                     <span class="cnt">${p.alive ? p.px : '💀'}</span>
                     <span class="rel">${REL_ICON[relation(S.me, p.id)] || ''}</span>
@@ -2563,7 +3342,7 @@
             const row = document.createElement('div');
             row.className = 'prop-row';
             const label = pr.kind === 'alliance' ? '🤝 İTTİFAK teklifi' : '🕊 BARIŞ teklifi';
-            row.innerHTML = `<div>${label}: <span style="color:${safeColor(from ? from.color : '#fff')}">${escapeHtml(from ? from.name : '?')}</span></div>`;
+            row.innerHTML = `<div style="display:flex;align-items:center;gap:6px;">${from ? flagImg(from.id) : ''}<span>${label}: ${escapeHtml(from ? from.name : '?')}</span></div>`;
             const btns = document.createElement('div'); btns.className = 'btns';
             const ok = document.createElement('button'); ok.className = 'dbtn peace'; ok.textContent = 'KABUL ET';
             ok.onclick = (e) => { e.stopPropagation(); Net.send({ t: 'respond', id: pr.id, accept: true }); };
@@ -2575,9 +3354,9 @@
 
         function open1v1Chat(targetPlayer) {
             openWindow('chat1v1Window');       // önce pencereyi aç (closeAllWindows partneri sıfırlar)...
-            active1v1Partner = targetPlayer;   // ...sonra partneri ata (eski sürümdeki hata düzeltildi)
+            active1v1Partner = targetPlayer;   // ...sonra partneri ata
             unreadMessages[targetPlayer.id] = false;
-            $('chat1v1Title').innerText = `1v1: ${targetPlayer.name}`;
+            $('chat1v1Title').innerHTML = `${flagImg(targetPlayer.id)}<span>${escapeHtml(targetPlayer.name)}</span>`;
             render1v1Messages();
             renderDiploActions();
             refreshDiplomacyList();
@@ -2590,16 +3369,8 @@
             msgBox.innerHTML = "";
             let logs = private1v1Logs[active1v1Partner.id] || [];
             logs.forEach(msg => {
-                const sender = pl(msg.from) || { name: '?', color: '#fff' };
-                const line = document.createElement('div');
-                line.className = 'chat-msg';
-                line.innerHTML = `
-                    <div class="msg-line">
-                        <div class="flag-box" style="background-color: ${safeColor(sender.color)};"></div>
-                        <span style="color: ${safeColor(sender.color)};">${escapeHtml(sender.name)}:</span>
-                    </div>
-                    <div style="margin-top: 4px;">${escapeHtml(msg.text)}</div>`;
-                msgBox.appendChild(line);
+                const sender = pl(msg.from);
+                msgBox.appendChild(newsRow('', sender ? flagImg(sender.id) : '', sender ? escapeHtml(sender.name) : '?', msg.text));
             });
             msgBox.scrollTop = msgBox.scrollHeight;
         }
@@ -2624,6 +3395,7 @@
         function renderDiploActions() {
             const box = $('diploActions');
             if (!box) return;
+            if (Object.keys(armed).length && box.querySelector('.armed')) return; // onay beklerken yeniden çizme
             box.innerHTML = '';
             const t = active1v1Partner && pl(active1v1Partner.id);
             if (!t) return;
@@ -2637,29 +3409,37 @@
                 : rel === 'pending' ? `DURUM: ⏳ SAVAŞ İLAN EDİLDİ — TUR ${w[2]} başında aktifleşir`
                 : 'DURUM: BARIŞ';
             box.appendChild(status);
-
-            // bu oyuncudan gelen teklifler
+            const lk = lockBetween(S.me, t.id);
+            const left = lk ? (lk[3] - S.round) : 0;
+            if (lk) {
+                const n = document.createElement('div'); n.className = 'lock-note';
+                n.textContent = lk[2] === 'peace' ? `🕊 Barış kilidi: ${left} tur savaş ilan edilemez` : lk[2] === 'alliance' ? `🤝 İttifak kilidi: ${left} tur bozulamaz` : `💔 İttifak bozma kilidi: ${left} tur savaş/ittifak yok`;
+                box.appendChild(n);
+            }
+            const warProtected = S.phase === 'PLAYING' && S.round <= protRounds();
+            if (warProtected) { const n = document.createElement('div'); n.className = 'lock-note'; n.textContent = `🛡 Savaş koruması: TUR ${protRounds() + 1} başlayana kadar savaş ilan edilemez, işgal yapılamaz.`; box.appendChild(n); }
+            const gcd = S.you.giftCd || 0;
+            if (gcd > 0) { const n = document.createElement('div'); n.className = 'lock-note'; n.textContent = `⏳ Toprak transferi bekleme süresi: ${gcd} tur.`; box.appendChild(n); }
             S.props.filter(p => p.to === S.me && p.from === t.id).forEach(pr => box.appendChild(proposalRow(pr)));
             const mineOut = (kind) => S.props.some(p => p.from === S.me && p.to === t.id && p.kind === kind);
 
             const grid = document.createElement('div'); grid.className = 'diplo-grid';
-            // İTTİFAK KUR / İTTİFAKI BOZ
             if (rel === 'ally') {
-                const b = mkBtn('neutral', 'İTTİFAKI BOZ', !playing);
-                if (playing) armConfirm(b, 'unally' + t.id, () => Net.send({ t: 'unally', to: t.id }));
+                const locked = lk && lk[2] === 'alliance';
+                const b = mkBtn('neutral', 'İTTİFAKI BOZ', !playing || locked, null, locked ? 'İttifak kilidi' : '');
+                if (playing && !locked) armConfirm(b, 'unally' + t.id, () => Net.send({ t: 'unally', to: t.id }));
                 grid.appendChild(b);
             } else {
-                const dis = !playing || rel !== 'peace' || mineOut('alliance');
+                const blocked = lk && lk[2] === 'breakup';
+                const dis = !playing || rel !== 'peace' || mineOut('alliance') || blocked;
                 grid.appendChild(mkBtn('ally', mineOut('alliance') ? 'TEKLİF GÖNDERİLDİ' : 'İTTİFAK KUR', dis, () => Net.send({ t: 'propose', kind: 'alliance', to: t.id }),
-                    rel !== 'peace' ? 'Savaştaki ülkeyle ittifak kurulamaz' : ''));
+                    rel !== 'peace' ? 'Savaştaki ülkeyle ittifak kurulamaz' : (blocked ? 'İttifak bozma kilidi' : '')));
             }
-            // PİKSEL VER
-            grid.appendChild(mkBtn('gift', 'PİKSEL VER', !(playing && rel === 'ally'), () => enterGiftMode(t.id), 'Sadece müttefiklere'));
-            // SAVAŞ İLAN ET
-            const wb = mkBtn('war', 'SAVAŞ İLAN ET', !(playing && rel === 'peace'), null, rel === 'ally' ? 'Önce ittifakı boz' : '');
-            if (playing && rel === 'peace') armConfirm(wb, 'war' + t.id, () => Net.send({ t: 'war', to: t.id }));
+            grid.appendChild(mkBtn('gift', gcd > 0 ? `PİKSEL VER (${gcd} TUR)` : 'PİKSEL VER', !playing || gcd > 0, () => enterGiftMode(t.id), gcd > 0 ? 'Transfer bekleme süresi aktif' : 'En fazla 3 komşu sınır pikseli; sonra 5 tur bekleme'));
+            const warLocked = (lk && (lk[2] === 'peace' || lk[2] === 'breakup')) || warProtected;
+            const wb = mkBtn('war', 'SAVAŞ İLAN ET', !(playing && rel === 'peace') || warLocked, null, rel === 'ally' ? 'Önce ittifakı boz' : (warProtected ? 'Savaş koruması' : (warLocked ? 'Antlaşma kilidi' : '')));
+            if (playing && rel === 'peace' && !warLocked) armConfirm(wb, 'war' + t.id, () => Net.send({ t: 'war', to: t.id }));
             grid.appendChild(wb);
-            // BARIŞ TEKLİFİ GÖNDER
             const atWar = rel === 'war' || rel === 'pending';
             grid.appendChild(mkBtn('peace', mineOut('peace') ? 'TEKLİF GÖNDERİLDİ' : 'BARIŞ TEKLİFİ GÖNDER', !(playing && atWar) || mineOut('peace'),
                 () => Net.send({ t: 'propose', kind: 'peace', to: t.id })));
@@ -2668,29 +3448,41 @@
 
         /* --------------------------------------------------- PİKSEL VER ---- */
         function enterGiftMode(toId) {
-            if (!(S.phase === 'PLAYING') || !isAlly(S.me, toId)) return;
+            if (S.phase !== 'PLAYING' || (S.you.giftCd || 0) > 0) return;
+            const tt = pl(toId); if (!tt || !tt.alive) return;
+            S.relocating = false; syncCapSelect();
+            outQueue = []; giftPicked.clear();
             S.gift = { to: toId };
             closeAllWindows();
-            const t = pl(toId);
-            $('giftBarText').textContent = `PİKSEL VER → ${t ? t.name : '?'} : kendi piksellerine tıkla / sürükle (başkent devredilemez)`;
+            updateGiftBarText();
             $('giftBar').style.display = 'flex';
             updateHud();
         }
+        function confirmGift() {
+            if (!S.gift) return;
+            if (!outQueue.length) return toastOnce('giftnone', 'Önce alıcıya komşu sınırdan en fazla ' + giftMax() + ' piksel seç.', 'bad', 1500);
+            outMode = 'gift';
+            flushQueue(true);
+            exitGiftMode();
+        }
         function exitGiftMode(silent) {
-            flushQueue();
+            outQueue = []; giftPicked.clear();
+            if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
             S.gift = null;
             $('giftBar').style.display = 'none';
             if (!silent) updateHud();
         }
 
         /* ================================================== BAŞLANGIÇ ====== */
-        initLobbyUI();
+        initJoinForm();
+        if (window.pxSyncLayoutButtons) pxSyncLayoutButtons();
+        updateLayoutBtn();
         requestAnimationFrame(drawMap);
 
-        // sayfa yenilense bile aynı oturuma geri dön (yalnızca çevrimiçi)
-        (function autoResume() {
+        (function boot() {
             const tok = store('session', 'px_token'), url = store('session', 'px_url');
-            if (tok && url && validWsUrl(url)) connect(null, url, tok);
+            if (tok && url && validWsUrl(url)) return connect(null, url, tok);          // sayfa yenilense bile oturuma dön
+            if (store('session', 'px_autojoin')) { store('session', 'px_autojoin', null); joinFromForm(true); }   // ana menüden geldi
         })();
 
     </script>
