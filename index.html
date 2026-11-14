@@ -1,8 +1,34 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="tr">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <script>
+    /* GÖRÜNÜM (Masaüstü / Mobil) — index.html ve game.html ortak. Tercih localStorage 'px_layout'.
+       Masaüstü: sabit orantılı 1100px ölçek (telefonda küçülterek sığdırır). Mobil: esnek, ekrana yayılan düzen. */
+    (function () {
+        var KEY = 'px_layout', root = document.documentElement;
+        function stored() { try { var v = localStorage.getItem(KEY); return (v === 'mobile' || v === 'desktop') ? v : null; } catch (e) { return null; } }
+        function auto() { try { return (matchMedia('(pointer:coarse)').matches || Math.min(screen.width, screen.height) < 700) ? 'mobile' : 'desktop'; } catch (e) { return 'desktop'; } }
+        function apply(m) {
+            window.PX_LAYOUT = m;
+            root.classList.remove('layout-desktop', 'layout-mobile'); root.classList.add('layout-' + m);
+            var v = document.querySelector('meta[name="viewport"]');
+            if (v) v.setAttribute('content', m === 'desktop' ? 'width=1100' : 'width=device-width, initial-scale=1, viewport-fit=cover');
+            var bs = document.querySelectorAll('[data-layout]');
+            for (var i = 0; i < bs.length; i++) bs[i].classList.toggle('active', bs[i].getAttribute('data-layout') === m);
+            try { window.dispatchEvent(new Event('pxlayout')); } catch (e) { /* */ }
+        }
+        window.pxSetLayout = function (m) { m = (m === 'mobile') ? 'mobile' : 'desktop'; try { localStorage.setItem(KEY, m); } catch (e) { /* */ } apply(m); };
+        window.pxSyncLayoutButtons = function () { apply(window.PX_LAYOUT); };
+        window.PX_LAYOUT = stored() || auto(); apply(window.PX_LAYOUT);
+    })();
+    </script>
     <title>Pixel Strategy Game</title>
+    <link rel="icon" href="data:,">
+    <!-- Sunucu (server.js) bu etikete kendi wss:// adresini yazar. Statik barındırıyorsan kendi adresini yaz:
+         content="wss://oyun.siten.com/ws"   (boş = çevrimdışı/botlu mod) -->
+    <meta name="px-ws-url" content="">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
 
@@ -11,6 +37,7 @@
             background-size: cover;
             background-position: center;
             background-repeat: no-repeat;
+            background-attachment: fixed;
             background-color: #000000;
             color: white;
             font-family: 'Press Start 2P', monospace;
@@ -19,7 +46,7 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            height: 100vh;
+            min-height: 100vh;
             box-sizing: border-box;
             image-rendering: pixelated;
         }
@@ -29,10 +56,11 @@
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
-            margin-bottom: 30px;
+            margin-bottom: 24px;
             background-color: rgba(0, 0, 0, 0.75);
             padding: 15px;
             border: 4px solid #fff;
+            box-sizing: border-box;
         }
 
         .flag-section, .country-section {
@@ -42,13 +70,14 @@
             gap: 10px;
         }
 
+        /* BAYRAK: oran 30x15'e KİLİTLİ (her zaman 2:1; tam sayı katları) */
         #miniFlagCanvas {
             border: 4px solid #fff;
             background-color: white;
             cursor: pointer;
             image-rendering: pixelated;
-            width: 128px;
-            height: 85px;
+            width: 120px;
+            height: 60px;
         }
 
         .pixel-btn {
@@ -62,10 +91,8 @@
             cursor: pointer;
             box-shadow: 3px 3px 0px #000;
         }
-        .pixel-btn:hover {
-            background-color: #27ae60;
-            color: white;
-        }
+        .pixel-btn:hover { background-color: #27ae60; color: white; }
+        .pixel-btn:disabled { background: #555; color: #999; cursor: not-allowed; }
 
         #countryInput {
             background-color: #d3d3d3;
@@ -78,24 +105,21 @@
             width: 280px;
             outline: none;
         }
+        #countryInput.err { border-color: #e74c3c; }
 
         .point-box {
             background-color: #d3d3d3;
             border: 4px solid #fff;
             padding: 12px 20px;
-            font-size: 11px;
+            font-size: 10px;
+            line-height: 1.7;
             color: black;
             box-shadow: 3px 3px 0px #000;
+            text-align: center;
         }
+        .point-box b { font-size: 16px; color: #b45309; }
 
-        .menu-buttons {
-            display: flex;
-            flex-direction: column;
-            gap: 25px;
-            align-items: center;
-            margin-top: auto;
-            margin-bottom: auto;
-        }
+        .menu-area { display: flex; flex-direction: column; gap: 18px; align-items: center; width: 100%; max-width: 780px; margin: 0 auto; }
 
         .menu-btn {
             background-color: #d3d3d3;
@@ -108,11 +132,81 @@
             box-shadow: 5px 5px 0px #000;
             transition: 0.1s;
         }
-        .menu-btn:hover {
-            background-color: #e0e0e0;
-            transform: translate(-2px, -2px);
-            box-shadow: 7px 7px 0px #000;
-        }
+        .menu-btn:hover { background-color: #e0e0e0; transform: translate(-2px, -2px); box-shadow: 7px 7px 0px #000; }
+        .menu-btn.play { background: #2ecc71; }
+
+        /* ====================== SUNUCU TARAYICISI (canlı oda havuzu) ====================== */
+        .server-panel { width: 100%; background: rgba(8, 14, 32, 0.93); border: 4px solid #fff; box-sizing: border-box; box-shadow: 5px 5px 0 #000; }
+        .sp-head { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; border-bottom: 3px solid #fff; font-size: 11px; gap: 10px; flex-wrap: wrap; }
+        .sp-mode { font-size: 8px; color: #f1c40f; }
+        .sp-live { font-size: 7px; color: #2ecc71; display: flex; align-items: center; gap: 6px; }
+        .sp-live::before { content: ''; width: 8px; height: 8px; background: #2ecc71; box-shadow: 0 0 0 2px #000; animation: blink 1s steps(2) infinite; }
+        .sp-live.off { color: #94a3b8; } .sp-live.off::before { background: #94a3b8; animation: none; }
+        @keyframes blink { 50% { opacity: 0.25; } }
+        .sp-tabs { display: flex; border-bottom: 3px solid #fff; }
+        .sp-tab { flex: 1; font-family: 'Press Start 2P', monospace; font-size: 9px; line-height: 1.6; padding: 10px 6px; background: #111b33; color: #94a3b8; border: 0; border-right: 3px solid #fff; cursor: pointer; }
+        .sp-tab:last-child { border-right: 0; }
+        .sp-tab:hover { color: #fff; }
+        .sp-tab.active { background: #2ecc71; color: #000; }
+        .sp-tab.duel.active { background: #f39c12; }
+        .sp-tab .cnt { display: block; font-size: 7px; margin-top: 3px; }
+        .sp-list { max-height: 320px; overflow-y: auto; }
+        .sp-row { display: grid; grid-template-columns: 1.1fr 1.7fr 1.3fr 96px; gap: 10px; align-items: center; padding: 9px 12px; font-size: 8px; border-bottom: 2px solid #334155; line-height: 1.6; }
+        .sp-row.hdr { color: #94a3b8; font-size: 7px; }
+        .sp-row.fresh { animation: fresh 1.2s ease-out; }
+        @keyframes fresh { 0% { background: #f39c12; } 100% { background: transparent; } }
+        .rm-name { color: #fff; font-size: 9px; }
+        .rm-bar { display: flex; align-items: center; gap: 8px; min-width: 0; }
+        .segs { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 2px; flex: 1; min-width: 0; }
+        .seg { height: 10px; background: #1e293b; border: 1px solid #334155; }
+        .seg.on { background: #2ecc71; border-color: #000; }
+        .segs.hot .seg.on { background: #f39c12; }
+        .segs.duel .seg { height: 14px; }
+        .rm-cnt { font-size: 9px; color: #fff; white-space: nowrap; }
+        .rm-info.st-wait { color: #2ecc71; } .rm-info.st-start { color: #f39c12; } .rm-info.st-idle { color: #94a3b8; }
+        .sp-empty { padding: 16px 12px; font-size: 8px; color: #94a3b8; line-height: 1.8; }
+        .sp-note { padding: 8px 12px; font-size: 7px; color: #f39c12; line-height: 1.7; border-top: 2px solid #334155; }
+        .sp-foot { display: flex; gap: 8px; align-items: center; padding: 10px 12px; border-top: 3px solid #fff; font-size: 7px; flex-wrap: wrap; }
+        .sp-foot input { flex: 1; min-width: 200px; background: #d3d3d3; border: 3px solid #fff; padding: 8px; font-family: 'Press Start 2P', monospace; font-size: 8px; color: #000; outline: none; }
+        .sp-btn { font-size: 8px; padding: 6px 9px; }
+        .menu-btn.duel { background: #f39c12; }
+        .menu-btn.duel:hover { background: #ffb340; }
+        .btn-row2 { display: flex; gap: 14px; width: 100%; justify-content: center; flex-wrap: wrap; }
+
+        /* GÖRÜNÜM TOGGLE (sağ üst, sabit) */
+        .layout-toggle { position: fixed; top: 8px; right: 8px; z-index: 900; display: flex; align-items: center; gap: 6px; background: rgba(8, 14, 32, 0.95); border: 3px solid #fff; padding: 4px 6px; box-shadow: 3px 3px 0 #000; font-size: 7px; }
+        .lt-btn { font-family: 'Press Start 2P', monospace; font-size: 7px; padding: 7px 8px; background: #334155; color: #fff; border: 2px solid #fff; cursor: pointer; }
+        .lt-btn.active { background: #2ecc71; color: #000; }
+        #largeFlagCanvas { touch-action: none; }
+
+        /* ====================== GÖRÜNÜM: MASAÜSTÜ (sabit orantılı) / MOBİL (esnek) ====================== */
+        html.layout-desktop body { min-width: 980px; padding-top: 52px; }
+        html.layout-mobile body { padding: 54px 8px 18px; }
+        html.layout-mobile .lt-label { display: none; }
+        html.layout-mobile .top-container { flex-direction: column; align-items: center; gap: 14px; padding: 10px; border-width: 3px; }
+        html.layout-mobile #countryInput { width: min(300px, 80vw); font-size: 11px; box-sizing: border-box; }
+        html.layout-mobile .point-box { width: min(300px, 80vw); box-sizing: border-box; }
+        html.layout-mobile .menu-area { max-width: 600px; gap: 14px; }
+        html.layout-mobile .top-container { max-width: 600px; }
+        html.layout-mobile .menu-btn { font-size: 12px; padding: 14px 10px; width: 100%; box-sizing: border-box; }
+        html.layout-mobile .btn-row2 { flex-direction: column; gap: 14px; }
+        html.layout-mobile .sp-head { font-size: 10px; padding: 8px 10px; }
+        html.layout-mobile .sp-tab { font-size: 8px; padding: 10px 3px; }
+        html.layout-mobile .sp-row.hdr { display: none; }
+        html.layout-mobile .sp-row { grid-template-columns: 1fr auto; grid-template-areas: "name btn" "bar bar" "info info"; gap: 6px 10px; padding: 10px; }
+        html.layout-mobile .rm-name { grid-area: name; } html.layout-mobile .rm-bar { grid-area: bar; } html.layout-mobile .rm-info { grid-area: info; } html.layout-mobile .sp-row .sp-btn { grid-area: btn; padding: 10px 12px; }
+        html.layout-mobile .sp-foot { flex-direction: column; align-items: stretch; }
+        html.layout-mobile .sp-foot input { min-width: 0; width: 100%; box-sizing: border-box; font-size: 9px; padding: 10px; }
+        html.layout-mobile .sp-list { max-height: none; overflow: visible; }
+        html.layout-mobile #flagModal, html.layout-mobile #settingsModal { padding: 10px 6px; }
+        html.layout-mobile #largeFlagCanvas { width: min(480px, 94vw); height: auto; aspect-ratio: 2 / 1; }
+        html.layout-mobile .fe-right { width: min(340px, 94vw); box-sizing: border-box; }
+        html.layout-mobile .fe-left { max-width: 100%; }
+        html.layout-mobile .tool-btn { padding: 10px 8px; font-size: 8px; }
+        html.layout-mobile .color-picker-container { flex-wrap: wrap; justify-content: center; }
+        html.layout-mobile .settings-content { width: min(400px, 88vw); padding: 18px; box-sizing: border-box; }
+        html.layout-mobile #feTitle { font-size: 10px !important; text-align: center; }
+        html.layout-mobile .action-icon-btn { width: 56px; height: 56px; }
 
         /* Bayrak ve Ayarlar Modalları */
         #flagModal, #settingsModal {
@@ -123,23 +217,38 @@
             z-index: 1000;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
-            gap: 15px;
+            justify-content: flex-start;
+            gap: 12px;
+            overflow-y: auto;
+            padding: 16px 10px;
+            box-sizing: border-box;
         }
+        #settingsModal { justify-content: center; }
         #largeFlagCanvas {
             border: 4px solid white;
             background-color: white;
             cursor: crosshair;
             image-rendering: pixelated;
-            width: 480px;
-            height: 320px;
+            width: 480px;       /* 30x15 * 16: oran kilitli */
+            height: 240px;
+            display: block;
         }
-        .editor-tools { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
-        .tool-btn { padding: 8px 12px; font-size: 10px; font-family: 'Press Start 2P', monospace; background-color: #444; color: white; border: 2px solid white; cursor: pointer; }
+        .fe-main { display: flex; gap: 18px; align-items: flex-start; justify-content: center; flex-wrap: wrap; }
+        .fe-left { display: flex; flex-direction: column; gap: 10px; align-items: center; }
+        .fe-right { display: flex; flex-direction: column; gap: 8px; width: 330px; background: #111; border: 2px solid #fff; padding: 10px; }
+        .fe-title { font-size: 8px; color: #f1c40f; margin-top: 4px; }
+        .fe-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+        .fe-grid button { background: #222; border: 2px solid #666; padding: 3px; cursor: pointer; display: flex; justify-content: center; align-items: center; }
+        .fe-grid button.sel { border-color: #2ecc71; background: #0b3b2e; }
+        .fe-grid canvas { image-rendering: pixelated; display: block; }
+        .fe-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 8px; }
+        .fe-row input[type=color] { width: 44px; height: 28px; border: 2px solid #fff; background: #000; padding: 0; cursor: pointer; }
+        .editor-tools { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+        .tool-btn { padding: 8px 10px; font-size: 9px; font-family: 'Press Start 2P', monospace; background-color: #444; color: white; border: 2px solid white; cursor: pointer; }
         .tool-btn.active { background-color: #007bff; }
-        .color-picker-container { display: flex; align-items: center; gap: 15px; background: #111; padding: 10px 20px; border: 2px solid #fff; }
+        .color-picker-container { display: flex; align-items: center; gap: 12px; background: #111; padding: 8px 14px; border: 2px solid #fff; }
         .color-preview { width: 35px; height: 35px; border: 2px solid white; }
-        .slider-group { display: flex; flex-direction: column; gap: 5px; font-size: 9px; }
+        .slider-group { display: flex; flex-direction: column; gap: 4px; font-size: 8px; }
         .slider-group label { display: flex; justify-content: space-between; gap: 10px; }
         .modal-actions { display: flex; gap: 25px; margin-top: 5px; }
         .action-icon-btn { width: 45px; height: 45px; font-size: 18px; font-weight: bold; border: 2px solid white; cursor: pointer; display: flex; align-items: center; justify-content: center; }
@@ -154,39 +263,93 @@
 </head>
 <body>
 
+    <!-- GÖRÜNÜM: Masaüstü / Mobil -->
+    <div class="layout-toggle" id="layoutToggle">
+        <span class="lt-label" id="ltLabel">GÖRÜNÜM:</span>
+        <button class="lt-btn" data-layout="desktop" id="ltDesktop" onclick="pxSetLayout('desktop')">MASAÜSTÜ</button>
+        <button class="lt-btn" data-layout="mobile" id="ltMobile" onclick="pxSetLayout('mobile')">MOBİL</button>
+    </div>
+
     <div class="top-container">
         <div class="flag-section">
-            <canvas id="miniFlagCanvas" width="120" height="80" onclick="openFlagEditor()"></canvas>
-            <button class="pixel-btn" onclick="openFlagEditor()">EDIT FLAG</button>
+            <canvas id="miniFlagCanvas" width="30" height="15" onclick="openFlagEditor()"></canvas>
+            <button class="pixel-btn" id="editFlagBtn" onclick="openFlagEditor()">BAYRAĞI DÜZENLE</button>
         </div>
         <div class="country-section">
-            <input type="text" id="countryInput" placeholder="COUNTRY NAME">
+            <input type="text" id="countryInput" maxlength="16" placeholder="ÜLKE ADI" autocomplete="off">
         </div>
-        <div class="point-box" id="pointBox">POINTS: 0</div>
+        <div class="point-box" id="pointBox"><span id="expLabel">SAVAŞ DENEYİMİ</span><br><b id="expVal">0</b></div>
     </div>
 
-    <div class="menu-buttons">
-        <button class="menu-btn" onclick="playGame()">PLAY GAME</button>
-        <button class="menu-btn" onclick="goToSettings()">SETTINGS</button>
+    <div class="menu-area">
+        <div class="server-panel">
+            <div class="sp-head">
+                <span id="spTitle">SUNUCULAR</span>
+                <span class="sp-live off" id="spLive">…</span>
+                <span class="sp-mode" id="spMode"></span>
+                <button class="pixel-btn sp-btn" id="spRefresh" onclick="refreshServers(true)">↻ YENİLE</button>
+            </div>
+            <div class="sp-tabs">
+                <button class="sp-tab active" id="tabLobby" onclick="setTab('lobby')"><span id="tabLobbyT">15 KİŞİLİK LOBİLER</span><span class="cnt" id="tabLobbyC"></span></button>
+                <button class="sp-tab duel" id="tabDuel" onclick="setTab('duel')"><span id="tabDuelT">2 KİŞİLİK DÜELLO (1v1)</span><span class="cnt" id="tabDuelC"></span></button>
+            </div>
+            <div class="sp-list" id="serverList"></div>
+            <div class="sp-note" id="spNote"></div>
+            <div class="sp-foot">
+                <span id="spUrlLabel">SUNUCU ADRESİ:</span>
+                <input type="text" id="serverUrlInput" placeholder="wss://oyun.siten.com/ws  (boş = çevrimdışı, botlarla)" autocomplete="off" spellcheck="false">
+                <button class="pixel-btn sp-btn" id="spApply" onclick="applyServerUrl()">BAĞLAN</button>
+            </div>
+        </div>
+        <div class="btn-row2">
+            <button class="menu-btn play" id="playBtn" onclick="playGame()">HIZLI KATIL</button>
+            <button class="menu-btn duel" id="duelBtn" onclick="playDuel()">⚔ DÜELLO 1v1</button>
+        </div>
+        <button class="menu-btn" id="settingsBtn" onclick="goToSettings()">AYARLAR</button>
     </div>
 
-    <!-- Piksel Bayrak Düzenleme Ekranı -->
+    <!-- Piksel Bayrak Düzenleme Ekranı (30x15) -->
     <div id="flagModal">
-        <h2 style="font-size: 14px; margin: 0;">PIXEL FLAG EDITOR</h2>
-        <canvas id="largeFlagCanvas" width="120" height="80"></canvas>
-        <div class="editor-tools">
-            <button id="tool-brush" class="tool-btn active" onclick="setTool('brush')">BRUSH</button>
-            <button id="tool-bucket" class="tool-btn" onclick="setTool('bucket')">FILL</button>
-            <button id="tool-line" class="tool-btn" onclick="setTool('line')">LINE</button>
-            <button id="tool-rect" class="tool-btn" onclick="setTool('rect')">RECT</button>
-            <button id="tool-circle" class="tool-btn" onclick="setTool('circle')">CIRCLE</button>
-        </div>
-        <div class="color-picker-container">
-            <div id="colorPreview" class="color-preview" style="background-color: rgb(255, 0, 0);"></div>
-            <div class="slider-group">
-                <label>R: <span id="rVal">255</span> <input type="range" id="rangeR" min="0" max="255" value="255" oninput="updateColorFromSliders()"></label>
-                <label>G: <span id="gVal">0</span> <input type="range" id="rangeG" min="0" max="255" value="0" oninput="updateColorFromSliders()"></label>
-                <label>B: <span id="bVal">0</span> <input type="range" id="rangeB" min="0" max="255" value="0" oninput="updateColorFromSliders()"></label>
+        <h2 style="font-size: 13px; margin: 0;" id="feTitle">PİKSEL BAYRAK EDİTÖRÜ · 30×15</h2>
+        <div class="fe-main">
+            <div class="fe-left">
+                <canvas id="largeFlagCanvas" width="30" height="15"></canvas>
+                <div class="editor-tools">
+                    <button id="tool-brush" class="tool-btn active" onclick="setTool('brush')">FIRÇA</button>
+                    <button id="tool-bucket" class="tool-btn" onclick="setTool('bucket')">DOLDUR</button>
+                    <button id="tool-line" class="tool-btn" onclick="setTool('line')">ÇİZGİ</button>
+                    <button id="tool-rect" class="tool-btn" onclick="setTool('rect')">KUTU</button>
+                    <button id="tool-circle" class="tool-btn" onclick="setTool('circle')">DAİRE</button>
+                    <button class="tool-btn" onclick="undoFlag()">↶ GERİ AL</button>
+                    <button class="tool-btn" onclick="randomFlag()">🎲 RASTGELE</button>
+                </div>
+                <div class="color-picker-container">
+                    <div id="colorPreview" class="color-preview" style="background-color: rgb(255, 0, 0);"></div>
+                    <input type="color" id="brushColorInput" value="#ff0000" style="width:44px;height:30px;border:2px solid #fff;background:#000;padding:0;cursor:pointer;" oninput="setBrushFromHex(this.value)">
+                    <div class="slider-group">
+                        <label>R: <span id="rVal">255</span> <input type="range" id="rangeR" min="0" max="255" value="255" oninput="updateColorFromSliders()"></label>
+                        <label>G: <span id="gVal">0</span> <input type="range" id="rangeG" min="0" max="255" value="0" oninput="updateColorFromSliders()"></label>
+                        <label>B: <span id="bVal">0</span> <input type="range" id="rangeB" min="0" max="255" value="0" oninput="updateColorFromSliders()"></label>
+                    </div>
+                </div>
+            </div>
+            <div class="fe-right">
+                <div class="fe-title" id="feT1">DESEN</div>
+                <div class="fe-grid" id="patternGrid"></div>
+                <div class="fe-title" id="feT2">DESEN RENKLERİ (canlı)</div>
+                <div class="fe-row">
+                    <input type="color" id="pc1" value="#d32f2f" title="Renk 1"><input type="color" id="pc2" value="#ffffff" title="Renk 2"><input type="color" id="pc3" value="#1b5e20" title="Renk 3">
+                    <button class="tool-btn" onclick="swapPatternColors()">⇄</button>
+                </div>
+                <div class="fe-title" id="feT3">SEMBOL (damga)</div>
+                <div class="fe-grid" id="symbolGrid"></div>
+                <div class="fe-row">
+                    <span id="feSymCol">RENK:</span><input type="color" id="symColor" value="#ffd600" title="Sembol rengi">
+                    <button class="tool-btn pos active" id="pos-left" onclick="setSymPos('left')">SOL</button>
+                    <button class="tool-btn pos" id="pos-center" onclick="setSymPos('center')">ORTA</button>
+                    <button class="tool-btn pos" id="pos-right" onclick="setSymPos('right')">SAĞ</button>
+                </div>
+                <div class="fe-row"><button class="tool-btn" onclick="stampBorder()" id="feBorder">ÇERÇEVE EKLE (fırça rengi)</button></div>
             </div>
         </div>
         <div class="modal-actions">
@@ -198,237 +361,506 @@
     <!-- Ayarlar Ekranı -->
     <div id="settingsModal">
         <div class="settings-content">
-            <h2 id="settingsTitle">SETTINGS</h2>
+            <h2 id="settingsTitle">AYARLAR</h2>
             <div class="setting-group" style="display: flex; flex-direction: column; align-items: center; gap: 10px;">
-                <span id="langLabel">LANGUAGE:</span>
+                <span id="langLabel">DİL SEÇENEĞİ:</span>
                 <div class="lang-options">
-                    <button id="langEn" class="lang-btn active" onclick="setLanguage('en')">English</button>
-                    <button id="langTr" class="lang-btn" onclick="setLanguage('tr')">Türkçe</button>
+                    <button id="langEn" class="lang-btn" onclick="setLanguage('en')">English</button>
+                    <button id="langTr" class="lang-btn active" onclick="setLanguage('tr')">Türkçe</button>
                 </div>
             </div>
-            <div class="dev-info" id="devInfoText">DEVELOPER:<br>Oyunu sadece MR_OTTO geliştirdi.</div>
-            <button class="pixel-btn" onclick="closeSettings()" style="width: 100%; margin-top: 10px;" id="closeSettingsBtn">BACK</button>
+            <div class="dev-info" id="devInfoText">GELİŞTİRİCİ:<br>Sadece MR_OTTO tarafından geliştirildi.</div>
+            <button class="pixel-btn" onclick="closeSettings()" style="width: 100%; margin-top: 10px;" id="closeSettingsBtn">GERİ</button>
         </div>
     </div>
 
     <script>
-        const miniCanvas = document.getElementById('miniFlagCanvas');
-        const miniCtx = miniCanvas.getContext('2d');
-        const largeCanvas = document.getElementById('largeFlagCanvas');
-        const largeCtx = largeCanvas.getContext('2d');
+        const FW = 30, FH = 15;   // bayrak ölçüsü KİLİTLİ: 30x15 piksel
+        const $ = (id) => document.getElementById(id);
+        const miniCanvas = $('miniFlagCanvas'), miniCtx = miniCanvas.getContext('2d');
+        const largeCanvas = $('largeFlagCanvas'), largeCtx = largeCanvas.getContext('2d');
+        miniCtx.imageSmoothingEnabled = false; largeCtx.imageSmoothingEnabled = false;
 
-        // Görüntü kalitesini keskin tutmak için (pixelated render için)
-        miniCtx.imageSmoothingEnabled = false;
-        largeCtx.imageSmoothingEnabled = false;
+        function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { /* depolama kapalı */ } return null; }
 
-        miniCtx.fillStyle = 'white'; miniCtx.fillRect(0, 0, miniCanvas.width, miniCanvas.height);
-        largeCtx.fillStyle = 'white'; largeCtx.fillRect(0, 0, largeCanvas.width, largeCanvas.height);
+        /* ---------------------------------------------------------------- dil */
+        const T = {
+            tr: { edit: 'BAYRAĞI DÜZENLE', ph: 'ÜLKE ADI', exp: 'SAVAŞ DENEYİMİ', servers: 'SUNUCULAR', refresh: '↻ YENİLE', urlLabel: 'SUNUCU ADRESİ:', connect: 'BAĞLAN',
+                  play: 'HIZLI KATIL', settings: 'AYARLAR', feTitle: 'PİKSEL BAYRAK EDİTÖRÜ · 30×15', t1: 'DESEN', t2: 'DESEN RENKLERİ (canlı)', t3: 'SEMBOL (damga)',
+                  join: 'KATIL', full: 'DOLU', started: 'OYUNDA', lobby: 'LOBİ', name: 'SUNUCU', status: 'DURUM', players: 'OYUNCU', info: 'BİLGİ', offlineMode: 'ÇEVRİMDIŞI (botlarla)', onlineMode: 'ÇEVRİMİÇİ',
+                  local: 'Yerel Sunucu (çevrimdışı)', localInfo: 'botlarla anında başlar', noServers: 'Şu an açık sunucu yok. HIZLI KATIL ile yeni bir sunucu açılır.', unreachable: 'Sunucuya ulaşılamıyor. Adresi kontrol et veya boş bırakıp çevrimdışı oyna.',
+                  needName: 'Önce ülke adını yaz!', botIn: 'bot doldurma', startsIn: 'BAŞLIYOR', sl: 'sn',
+                  layout: 'GÖRÜNÜM:', desktop: 'MASAÜSTÜ', mobile: 'MOBİL', tabLobby: '15 KİŞİLİK LOBİLER', tabDuel: '2 KİŞİLİK DÜELLO (1v1)', duelBtn: '⚔ DÜELLO 1v1',
+                  open: 'açık', live: 'CANLI', liveOff: 'YEDEK YOKLAMA', online: 'ÇEVRİMİÇİ', waiting: 'OYUNCU BEKLENİYOR', emptyRoom: 'BOŞ · BEKLİYOR', oppWait: 'RAKİP BEKLENİYOR',
+                  startsNow: 'DOLU · BAŞLIYOR', localDuel: 'Yerel Düello (çevrimdışı)', localDuelInfo: 'bota karşı, anında',
+                  noteLobby: 'Lobi 15 kişiye ulaşınca 20 sn geri sayım başlar. Oyun başlayan oda listeden kalkar, yerine yenisi açılır.',
+                  noteDuel: 'Rakip bulunduğu an kısa geri sayım (5 sn) ve oyun başlar. Bot yok, gerçek rakip.', noteOffline: 'Çevrimdışı mod: botlarla anında oynarsın.' },
+            en: { edit: 'EDIT FLAG', ph: 'COUNTRY NAME', exp: 'WAR EXPERIENCE', servers: 'SERVERS', refresh: '↻ REFRESH', urlLabel: 'SERVER URL:', connect: 'CONNECT',
+                  play: 'QUICK JOIN', settings: 'SETTINGS', feTitle: 'PIXEL FLAG EDITOR · 30×15', t1: 'PATTERN', t2: 'PATTERN COLORS (live)', t3: 'SYMBOL (stamp)',
+                  join: 'JOIN', full: 'FULL', started: 'IN GAME', lobby: 'LOBBY', name: 'SERVER', status: 'STATUS', players: 'PLAYERS', info: 'INFO', offlineMode: 'OFFLINE (with bots)', onlineMode: 'ONLINE',
+                  local: 'Local Server (offline)', localInfo: 'starts instantly with bots', noServers: 'No open servers. QUICK JOIN opens a new one.', unreachable: 'Cannot reach server. Check the URL or leave empty to play offline.',
+                  needName: 'Enter a country name first!', botIn: 'bot fill', startsIn: 'STARTING', sl: 's',
+                  layout: 'VIEW:', desktop: 'DESKTOP', mobile: 'MOBILE', tabLobby: '15-PLAYER LOBBIES', tabDuel: '2-PLAYER DUEL (1v1)', duelBtn: '⚔ DUEL 1v1',
+                  open: 'open', live: 'LIVE', liveOff: 'POLLING', online: 'ONLINE', waiting: 'WAITING FOR PLAYERS', emptyRoom: 'EMPTY · WAITING', oppWait: 'WAITING FOR OPPONENT',
+                  startsNow: 'FULL · STARTING', localDuel: 'Local Duel (offline)', localDuelInfo: 'vs bot, instant',
+                  noteLobby: 'A 20 s countdown starts when a lobby reaches 15 players. Started rooms leave the list and a fresh one opens.',
+                  noteDuel: 'As soon as an opponent is found a short countdown (5 s) starts. No bots, a real opponent.', noteOffline: 'Offline mode: play instantly against bots.' }
+        };
+        let LANG = store('px_lang') === 'en' ? 'en' : 'tr';
+        const tt = (k) => T[LANG][k];
+        function applyLang() {
+            $('editFlagBtn').innerText = tt('edit'); $('countryInput').placeholder = tt('ph'); $('expLabel').innerText = tt('exp');
+            $('spTitle').innerText = tt('servers'); $('spRefresh').innerText = tt('refresh'); $('spUrlLabel').innerText = tt('urlLabel'); $('spApply').innerText = tt('connect');
+            $('playBtn').innerText = tt('play'); $('duelBtn').innerText = tt('duelBtn'); $('settingsBtn').innerText = tt('settings'); $('feTitle').innerText = tt('feTitle');
+            $('ltLabel').innerText = tt('layout'); $('ltDesktop').innerText = tt('desktop'); $('ltMobile').innerText = tt('mobile');
+            $('tabLobbyT').innerText = tt('tabLobby'); $('tabDuelT').innerText = tt('tabDuel');
+            $('feT1').innerText = tt('t1'); $('feT2').innerText = tt('t2'); $('feT3').innerText = tt('t3');
+            $('langEn').classList.toggle('active', LANG === 'en'); $('langTr').classList.toggle('active', LANG === 'tr');
+            if (LANG === 'en') {
+                $('settingsTitle').innerText = 'SETTINGS'; $('langLabel').innerText = 'LANGUAGE:'; $('closeSettingsBtn').innerText = 'BACK';
+                $('devInfoText').innerHTML = 'DEVELOPER:<br>Developed solely by MR_OTTO.';
+            } else {
+                $('settingsTitle').innerText = 'AYARLAR'; $('langLabel').innerText = 'DİL SEÇENEĞİ:'; $('closeSettingsBtn').innerText = 'GERİ';
+                $('devInfoText').innerHTML = 'GELİŞTİRİCİ:<br>Sadece MR_OTTO tarafından geliştirildi.';
+            }
+            renderServers();
+        }
+        function setLanguage(lang) { LANG = lang === 'en' ? 'en' : 'tr'; store('px_lang', LANG); applyLang(); }
 
-        let currentTool = 'brush';
-        let isDrawing = false;
-        let startX = 0, startY = 0;
-        let snapshot = null;
+        /* ================================================ BAYRAK EDİTÖRÜ (30x15) ================ */
+        let currentTool = 'brush', isDrawing = false, startX = 0, startY = 0, snapshot = null;
         let r = 255, g = 0, b = 0;
 
-        // --- BAYRAK DÜZENLEYİCİ ---
-        function updateColorFromSliders() {
-            r = document.getElementById('rangeR').value;
-            g = document.getElementById('rangeG').value;
-            b = document.getElementById('rangeB').value;
-            document.getElementById('rVal').innerText = r;
-            document.getElementById('gVal').innerText = g;
-            document.getElementById('bVal').innerText = b;
-            document.getElementById('colorPreview').style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
-        }
-
-        function getSelectedColorString() { return `rgb(${r}, ${g}, ${b})`; }
-        
-        function openFlagEditor() { 
-            largeCtx.clearRect(0, 0, largeCanvas.width, largeCanvas.height);
-            largeCtx.drawImage(miniCanvas, 0, 0, largeCanvas.width, largeCanvas.height); 
-            document.getElementById('flagModal').style.display = 'flex'; 
-        }
-
-        function closeFlagEditor(save) {
-            if (save) { 
-                miniCtx.clearRect(0, 0, miniCanvas.width, miniCanvas.height); 
-                miniCtx.drawImage(largeCanvas, 0, 0, miniCanvas.width, miniCanvas.height); 
+        const PATTERNS = [
+            ['solid', 'DÜZ'], ['h2', '2 YATAY'], ['h3', '3 YATAY'], ['v2', '2 DİKEY'], ['v3', '3 DİKEY'], ['cross', 'HAÇ'],
+            ['saltire', 'X'], ['diag', 'ÇAPRAZ'], ['quarters', 'DAMA'], ['triangle', 'ÜÇGEN'], ['border', 'ÇERÇEVE'], ['diamond', 'ELMAS']
+        ];
+        // desen: (x,y) -> 0|1|2 (renk 1/2/3 dizini)
+        function patternIdx(name, x, y) {
+            switch (name) {
+                case 'solid': return 0;
+                case 'h2': return y < 7 ? 0 : 1;
+                case 'h3': return y < 5 ? 0 : (y < 10 ? 1 : 2);
+                case 'v2': return x < 15 ? 0 : 1;
+                case 'v3': return x < 10 ? 0 : (x < 20 ? 1 : 2);
+                case 'cross': return (x >= 8 && x <= 11) || (y >= 6 && y <= 8) ? 1 : 0;
+                case 'saltire': return (Math.abs(y - x / 2) < 1.2 || Math.abs((FH - 1 - y) - x / 2) < 1.2) ? 1 : 0;
+                case 'diag': return y * 2 > x ? 0 : 1;
+                case 'quarters': return ((x < 15) !== (y < 7)) ? 0 : 1;
+                case 'triangle': return (x < 14 * (1 - Math.abs(y - 7) / 7.5)) ? 1 : 0;
+                case 'border': { const d = Math.min(x, y, FW - 1 - x, FH - 1 - y); return d < 2 ? 1 : (d < 3 ? 2 : 0); }
+                case 'diamond': return (Math.abs(x - 14.5) / 15 + Math.abs(y - 7) / 7.5 <= 0.82) ? 1 : 0;
+                default: return 0;
             }
-            document.getElementById('flagModal').style.display = 'none';
+        }
+        const SYMBOLS = {
+            star: ['....1....', '....1....', '...111...', '111111111', '.1111111.', '..11111..', '..11.11..', '.11...11.', '.1.....1.'],
+            crescent: ['..11111..', '.111.....', '111......', '111......', '111......', '111......', '.111.....', '..11111..', '.........'],
+            sun: ['....1....', '.1..1..1.', '..11111..', '..11111..', '111111111', '..11111..', '..11111..', '.1..1..1.', '....1....'],
+            plus: ['...111...', '...111...', '...111...', '111111111', '111111111', '111111111', '...111...', '...111...', '...111...'],
+            heart: ['.........', '.11...11.', '1111.1111', '111111111', '111111111', '.1111111.', '..11111..', '...111...', '....1....'],
+            skull: ['.1111111.', '111111111', '11.111.11', '11.111.11', '111111111', '.1111111.', '..1.1.1..', '..1.1.1..', '.........'],
+            crown: ['.........', '1...1...1', '11..1..11', '111.1.111', '111111111', '111111111', '111111111', '.........', '.........'],
+            tree: ['....1....', '...111...', '..11111..', '.1111111.', '...111...', '..11111..', '.1111111.', '....1....', '....1....'],
+            sword: ['........1', '.......11', '......11.', '.....11..', '1...11...', '.1.11....', '..11.....', '.1.1.....', '1...1....'],
+            diamond: ['....1....', '...111...', '..11111..', '.1111111.', '111111111', '.1111111.', '..11111..', '...111...', '....1....'],
+            ring: ['..11111..', '.111.111.', '111...111', '11.....11', '11.....11', '11.....11', '111...111', '.111.111.', '..11111..']
+        };
+        let curPattern = null, liveMode = false, symPos = 'left';
+        const undoStack = [];
+
+        function hexToRgb(h) { return [parseInt(h.substr(1, 2), 16), parseInt(h.substr(3, 2), 16), parseInt(h.substr(5, 2), 16)]; }
+        function pushUndo() { undoStack.push(largeCtx.getImageData(0, 0, FW, FH)); if (undoStack.length > 30) undoStack.shift(); }
+        function undoFlag() { const s = undoStack.pop(); if (s) { largeCtx.putImageData(s, 0, 0); liveMode = false; } }
+
+        function renderPattern(name, ctx2) {
+            const cols = [hexToRgb($('pc1').value), hexToRgb($('pc2').value), hexToRgb($('pc3').value)];
+            const img = ctx2.createImageData(FW, FH);
+            for (let y = 0; y < FH; y++) for (let x = 0; x < FW; x++) {
+                const c = cols[patternIdx(name, x, y)], o = (y * FW + x) * 4;
+                img.data[o] = c[0]; img.data[o + 1] = c[1]; img.data[o + 2] = c[2]; img.data[o + 3] = 255;
+            }
+            ctx2.putImageData(img, 0, 0);
+        }
+        function applyPattern(name, keepUndo) {
+            if (!keepUndo) pushUndo();
+            renderPattern(name, largeCtx);
+            curPattern = name; liveMode = true;
+            document.querySelectorAll('#patternGrid button').forEach(bn => bn.classList.toggle('sel', bn.dataset.p === name));
+        }
+        function buildPatternGrid() {
+            const grid = $('patternGrid'); grid.innerHTML = '';
+            PATTERNS.forEach(([name, label]) => {
+                const bn = document.createElement('button'); bn.dataset.p = name; bn.title = label;
+                const cv = document.createElement('canvas'); cv.width = FW; cv.height = FH; cv.style.width = '60px'; cv.style.height = '30px';
+                bn.appendChild(cv); bn.onclick = () => applyPattern(name, false); grid.appendChild(bn);
+            });
+            refreshPatternThumbs();
+        }
+        function refreshPatternThumbs() {
+            document.querySelectorAll('#patternGrid button').forEach(bn => renderPattern(bn.dataset.p, bn.firstChild.getContext('2d')));
+            drawSymbolThumbs();
+        }
+        function drawSymbolThumbs() {
+            document.querySelectorAll('#symbolGrid button').forEach(bn => {
+                const c2 = bn.firstChild.getContext('2d'); c2.clearRect(0, 0, 9, 9);
+                const rows = SYMBOLS[bn.dataset.s]; c2.fillStyle = $('symColor').value;
+                for (let y = 0; y < 9; y++) for (let x = 0; x < 9; x++) if (rows[y][x] === '1') c2.fillRect(x, y, 1, 1);
+            });
+        }
+        function buildSymbolGrid() {
+            const grid = $('symbolGrid'); grid.innerHTML = '';
+            Object.keys(SYMBOLS).forEach(name => {
+                const bn = document.createElement('button'); bn.dataset.s = name; bn.title = name;
+                const cv = document.createElement('canvas'); cv.width = 9; cv.height = 9; cv.style.width = '27px'; cv.style.height = '27px';
+                bn.appendChild(cv); bn.onclick = () => stampSymbol(name, true); grid.appendChild(bn);
+            });
+            drawSymbolThumbs();
+        }
+        function setSymPos(p) {
+            symPos = p;
+            document.querySelectorAll('.tool-btn.pos').forEach(bn => bn.classList.remove('active'));
+            $('pos-' + p).classList.add('active');
+        }
+        function stampSymbol(name, undoable) {
+            if (undoable) pushUndo();
+            liveMode = false;
+            const x0 = symPos === 'left' ? 3 : (symPos === 'center' ? 10 : 18), y0 = 3;
+            const rows = SYMBOLS[name]; largeCtx.fillStyle = $('symColor').value;
+            for (let y = 0; y < 9; y++) for (let x = 0; x < 9; x++) if (rows[y][x] === '1') largeCtx.fillRect(x0 + x, y0 + y, 1, 1);
+        }
+        function stampBorder() {
+            pushUndo(); liveMode = false; largeCtx.fillStyle = getSelectedColorString();
+            largeCtx.fillRect(0, 0, FW, 1); largeCtx.fillRect(0, FH - 1, FW, 1); largeCtx.fillRect(0, 0, 1, FH); largeCtx.fillRect(FW - 1, 0, 1, FH);
+        }
+        function swapPatternColors() {
+            const a = $('pc1').value; $('pc1').value = $('pc2').value; $('pc2').value = a; onPatternColorChange();
+        }
+        function onPatternColorChange() { // dinamik renk seçici: küçük resimler ve (canlı modda) bayrak anında güncellenir
+            refreshPatternThumbs();
+            if (liveMode && curPattern) applyPattern(curPattern, true);
+        }
+        function randomHex() {
+            const h = Math.floor(Math.random() * 360), s = 55 + Math.random() * 35, l = 32 + Math.random() * 30;
+            const k = (n) => (n + h / 30) % 12, a = (s / 100) * Math.min(l / 100, 1 - l / 100);
+            const f = (n) => l / 100 - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+            return '#' + [f(0), f(8), f(4)].map(v => Math.round(255 * v).toString(16).padStart(2, '0')).join('');
+        }
+        function randomFlag() {
+            pushUndo();
+            $('pc1').value = randomHex(); $('pc2').value = Math.random() < 0.5 ? '#ffffff' : randomHex(); $('pc3').value = randomHex();
+            applyPattern(PATTERNS[Math.floor(Math.random() * PATTERNS.length)][0], true);
+            if (Math.random() < 0.6) {
+                $('symColor').value = Math.random() < 0.5 ? '#ffd600' : '#ffffff';
+                setSymPos(['left', 'center', 'right'][Math.floor(Math.random() * 3)]);
+                const names = Object.keys(SYMBOLS);
+                stampSymbol(names[Math.floor(Math.random() * names.length)], false);
+            }
+            refreshPatternThumbs();
         }
 
+        function updateColorFromSliders() {
+            r = parseInt($('rangeR').value); g = parseInt($('rangeG').value); b = parseInt($('rangeB').value);
+            $('rVal').innerText = r; $('gVal').innerText = g; $('bVal').innerText = b;
+            $('colorPreview').style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
+            $('brushColorInput').value = '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join('');
+        }
+        function setBrushFromHex(hex) {
+            const c = hexToRgb(hex); $('rangeR').value = c[0]; $('rangeG').value = c[1]; $('rangeB').value = c[2]; updateColorFromSliders();
+        }
+        function getSelectedColorString() { return `rgb(${r}, ${g}, ${b})`; }
+
+        /* ---- bayrak <-> base64 (450 piksel * RGB = 1350 bayt = 1800 karakter) ---- */
+        function flagToB64(cv) {
+            const d = cv.getContext('2d').getImageData(0, 0, FW, FH).data; let s = '';
+            for (let i = 0; i < FW * FH; i++) s += String.fromCharCode(d[i * 4], d[i * 4 + 1], d[i * 4 + 2]);
+            return btoa(s);
+        }
+        function b64ToCanvas(b64, cv) {
+            if (!/^[A-Za-z0-9+/]{1800}$/.test(b64 || '')) return false;
+            const bin = atob(b64), c = cv.getContext('2d'), img = c.createImageData(FW, FH);
+            for (let i = 0; i < FW * FH; i++) { img.data[i * 4] = bin.charCodeAt(i * 3); img.data[i * 4 + 1] = bin.charCodeAt(i * 3 + 1); img.data[i * 4 + 2] = bin.charCodeAt(i * 3 + 2); img.data[i * 4 + 3] = 255; }
+            c.putImageData(img, 0, 0); return true;
+        }
+
+        function openFlagEditor() {
+            largeCtx.clearRect(0, 0, FW, FH);
+            largeCtx.drawImage(miniCanvas, 0, 0, FW, FH);
+            undoStack.length = 0; liveMode = false; curPattern = null;
+            document.querySelectorAll('#patternGrid button').forEach(bn => bn.classList.remove('sel'));
+            $('flagModal').style.display = 'flex';
+        }
+        function closeFlagEditor(save) {
+            if (save) {
+                miniCtx.clearRect(0, 0, FW, FH); miniCtx.drawImage(largeCanvas, 0, 0, FW, FH);
+                store('px_flag', flagToB64(miniCanvas));   // oyun lobisine/sunucuya bu biçimde gider
+            }
+            $('flagModal').style.display = 'none';
+        }
         function setTool(tool) {
             currentTool = tool;
-            document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
-            document.getElementById('tool-' + tool).classList.add('active');
+            document.querySelectorAll('.tool-btn[id^="tool-"]').forEach(btn => btn.classList.remove('active'));
+            const el = $('tool-' + tool); if (el) el.classList.add('active');
         }
 
         function getCanvasCoordinates(e) {
             const rect = largeCanvas.getBoundingClientRect();
-            const scaleX = largeCanvas.width / rect.width;
-            const scaleY = largeCanvas.height / rect.height;
-            return {
-                x: Math.floor((e.clientX - rect.left) * scaleX),
-                y: Math.floor((e.clientY - rect.top) * scaleY)
-            };
+            return { x: Math.floor((e.clientX - rect.left) * (FW / rect.width)), y: Math.floor((e.clientY - rect.top) * (FH / rect.height)) };
         }
-
-        largeCanvas.addEventListener('mousedown', (e) => {
-            isDrawing = true;
-            const coords = getCanvasCoordinates(e);
-            startX = coords.x; 
-            startY = coords.y;
-            
-            if (currentTool === 'brush') {
-                drawPixel(coords.x, coords.y);
-            } else if (currentTool === 'bucket') {
-                handleBucketFill(coords.x, coords.y);
-                isDrawing = false;
-            } else {
-                snapshot = largeCtx.getImageData(0, 0, largeCanvas.width, largeCanvas.height);
-            }
-        });
-
-        window.addEventListener('mouseup', (e) => {
-            if (!isDrawing) return;
-            isDrawing = false;
-            if (['line', 'rect', 'circle'].includes(currentTool)) {
-                const coords = getCanvasCoordinates(e);
-                drawShape(coords.x, coords.y);
-            }
-        });
-
-        largeCanvas.addEventListener('mousemove', (e) => {
-            if (!isDrawing) return;
-            const coords = getCanvasCoordinates(e);
-            if (currentTool === 'brush') {
-                drawPixel(coords.x, coords.y);
-            } else if (['line', 'rect', 'circle'].includes(currentTool)) {
-                if (snapshot) {
-                    largeCtx.putImageData(snapshot, 0, 0);
-                    drawShape(coords.x, coords.y);
-                }
-            }
-        });
-
         function drawPixel(x, y) {
-            if (x >= 0 && x < largeCanvas.width && y >= 0 && y < largeCanvas.height) {
-                largeCtx.fillStyle = getSelectedColorString();
-                largeCtx.fillRect(x, y, 1, 1);
-            }
+            if (x >= 0 && x < FW && y >= 0 && y < FH) { largeCtx.fillStyle = getSelectedColorString(); largeCtx.fillRect(x, y, 1, 1); }
         }
-
+        function pixelLine(x0, y0, x1, y1) { // Bresenham: bulanık kenar yok, saf piksel
+            const dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1; let err = dx + dy;
+            for (let i = 0; i < 200; i++) { drawPixel(x0, y0); if (x0 === x1 && y0 === y1) break; const e2 = 2 * err; if (e2 >= dy) { err += dy; x0 += sx; } if (e2 <= dx) { err += dx; y0 += sy; } }
+        }
         function drawShape(endX, endY) {
             largeCtx.fillStyle = getSelectedColorString();
-            largeCtx.strokeStyle = getSelectedColorString();
-            largeCtx.lineWidth = 1;
-
             if (currentTool === 'rect') {
-                let width = endX - startX;
-                let height = endY - startY;
-                largeCtx.fillRect(startX, startY, width, height);
+                const x0 = Math.min(startX, endX), y0 = Math.min(startY, endY), w = Math.abs(endX - startX) + 1, h = Math.abs(endY - startY) + 1;
+                largeCtx.fillRect(x0, y0, w, h);
             } else if (currentTool === 'line') {
-                largeCtx.beginPath();
-                largeCtx.moveTo(startX + 0.5, startY + 0.5);
-                largeCtx.lineTo(endX + 0.5, endY + 0.5);
-                largeCtx.stroke();
+                pixelLine(startX, startY, endX, endY);
             } else if (currentTool === 'circle') {
-                let radius = Math.round(Math.hypot(endX - startX, endY - startY));
-                largeCtx.beginPath();
-                largeCtx.arc(startX, startY, radius, 0, 2 * Math.PI);
-                largeCtx.fill();
+                const rad = Math.hypot(endX - startX, endY - startY);
+                for (let y = Math.floor(startY - rad); y <= Math.ceil(startY + rad); y++) for (let x = Math.floor(startX - rad); x <= Math.ceil(startX + rad); x++) {
+                    if (Math.hypot(x - startX, y - startY) <= rad + 0.2) drawPixel(x, y);
+                }
             }
         }
 
-        function handleBucketFill(startX, startY) {
-            const imgData = largeCtx.getImageData(0, 0, largeCanvas.width, largeCanvas.height);
-            const data = imgData.data;
-            const width = largeCanvas.width;
-            const height = largeCanvas.height;
+        /* çizim girdisi: fare VE dokunmatik aynı mantığı kullanır (telefonda bayrak çizilebilir) */
+        let lastPt = null;
+        function fdStart(pt) {
+            isDrawing = true; lastPt = pt;
+            const c = getCanvasCoordinates(pt);
+            startX = c.x; startY = c.y;
+            pushUndo(); liveMode = false;
+            if (currentTool === 'brush') drawPixel(c.x, c.y);
+            else if (currentTool === 'bucket') { handleBucketFill(c.x, c.y); isDrawing = false; }
+            else snapshot = largeCtx.getImageData(0, 0, FW, FH);
+        }
+        function fdMove(pt) {
+            if (!isDrawing) return;
+            lastPt = pt;
+            const c = getCanvasCoordinates(pt);
+            if (currentTool === 'brush') { pixelLine(startX, startY, c.x, c.y); startX = c.x; startY = c.y; }
+            else if (snapshot && ['line', 'rect', 'circle'].includes(currentTool)) { largeCtx.putImageData(snapshot, 0, 0); drawShape(c.x, c.y); }
+        }
+        function fdEnd(pt) {
+            if (!isDrawing) return;
+            isDrawing = false;
+            if (['line', 'rect', 'circle'].includes(currentTool)) { const c = getCanvasCoordinates(pt || lastPt); if (snapshot) largeCtx.putImageData(snapshot, 0, 0); drawShape(c.x, c.y); }
+        }
+        largeCanvas.addEventListener('mousedown', (e) => fdStart(e));
+        window.addEventListener('mouseup', (e) => fdEnd(e));
+        largeCanvas.addEventListener('mousemove', (e) => fdMove(e));
+        const touchPt = (e) => { const t = (e.touches && e.touches[0]) || (e.changedTouches && e.changedTouches[0]); return t ? { clientX: t.clientX, clientY: t.clientY } : null; };
+        largeCanvas.addEventListener('touchstart', (e) => { const p = touchPt(e); if (!p) return; e.preventDefault(); fdStart(p); }, { passive: false });
+        largeCanvas.addEventListener('touchmove', (e) => { const p = touchPt(e); if (!p) return; e.preventDefault(); fdMove(p); }, { passive: false });
+        window.addEventListener('touchend', (e) => { const p = touchPt(e); fdEnd(p); });
+        window.addEventListener('touchcancel', () => fdEnd(null));
 
-            const targetIdx = (startY * width + startX) * 4;
-            const targetR = data[targetIdx];
-            const targetG = data[targetIdx + 1];
-            const targetB = data[targetIdx + 2];
-            const targetA = data[targetIdx + 3];
-
-            const fillR = parseInt(r);
-            const fillG = parseInt(g);
-            const fillB = parseInt(b);
-            const fillA = 255;
-
-            if (targetR === fillR && targetG === fillG && targetB === fillB && targetA === fillA) return;
-
-            const queue = [[startX, startY]];
-            const visited = new Uint8Array(width * height);
-
-            while (queue.length > 0) {
+        function handleBucketFill(sx, sy) {
+            if (sx < 0 || sx >= FW || sy < 0 || sy >= FH) return;
+            const imgData = largeCtx.getImageData(0, 0, FW, FH), data = imgData.data;
+            const ti = (sy * FW + sx) * 4, tr = data[ti], tg = data[ti + 1], tb = data[ti + 2];
+            if (tr === r && tg === g && tb === b) return;
+            const queue = [[sx, sy]], visited = new Uint8Array(FW * FH);
+            while (queue.length) {
                 const [cx, cy] = queue.pop();
-                if (cx < 0 || cx >= width || cy < 0 || cy >= height) continue;
-                
-                const idx = cy * width + cx;
-                if (visited[idx]) continue;
-                visited[idx] = 1;
-
-                const currIdx = (cy * width + cx) * 4;
-                if (
-                    data[currIdx] === targetR &&
-                    data[currIdx + 1] === targetG &&
-                    data[currIdx + 2] === targetB &&
-                    data[currIdx + 3] === targetA
-                ) {
-                    data[currIdx] = fillR;
-                    data[currIdx + 1] = fillG;
-                    data[currIdx + 2] = fillB;
-                    data[currIdx + 3] = fillA;
-
-                    queue.push([cx + 1, cy]);
-                    queue.push([cx - 1, cy]);
-                    queue.push([cx, cy + 1]);
-                    queue.push([cx, cy - 1]);
+                if (cx < 0 || cx >= FW || cy < 0 || cy >= FH) continue;
+                const idx = cy * FW + cx; if (visited[idx]) continue; visited[idx] = 1;
+                const ci = idx * 4;
+                if (data[ci] === tr && data[ci + 1] === tg && data[ci + 2] === tb) {
+                    data[ci] = r; data[ci + 1] = g; data[ci + 2] = b; data[ci + 3] = 255;
+                    queue.push([cx + 1, cy], [cx - 1, cy], [cx, cy + 1], [cx, cy - 1]);
                 }
             }
-
             largeCtx.putImageData(imgData, 0, 0);
         }
 
-        // --- OYUNA GEÇİŞ: ülke adını game.html'e (lobi) aktar ---
-        function playGame() {
-            const name = document.getElementById('countryInput').value.trim();
-            try { localStorage.setItem('px_country', name); } catch (e) { /* depolama kapalı */ }
+        ['pc1', 'pc2', 'pc3'].forEach(id => $(id).addEventListener('input', onPatternColorChange));
+        $('symColor').addEventListener('input', drawSymbolThumbs);
+
+        /* ======================================= SUNUCU TARAYICISI (canlı oda havuzu) =================================
+         * Sunucu /api/servers/stream (SSE) ile değişiklikleri anında iter; SSE yoksa/kopuksa 3 sn'de bir yoklar.
+         * Satırlar yerinde güncellenir (DOM yeniden kurulmaz): buton tıklaması asla kaybolmaz, yeni oda kutucuğu
+         * kısa bir turuncu parlama ile belirir, oyuna başlayan oda listeden anında silinir. */
+        function metaUrl() { const m = document.querySelector('meta[name="px-ws-url"]'); return m ? (m.getAttribute('content') || '').trim() : ''; }
+        function currentWsUrl() { return ($('serverUrlInput').value || '').trim() || metaUrl(); }
+        function apiBase(url) {
+            if (!url) return '';
+            try { const u = new URL(url); if (u.protocol !== 'ws:' && u.protocol !== 'wss:') return null; return (u.protocol === 'wss:' ? 'https:' : 'http:') + '//' + u.host; } catch (e) { return null; }
+        }
+        let activeTab = store('px_tab') === 'duel' ? 'duel' : 'lobby';
+
+        function startGame(roomId, mode) {
+            const name = $('countryInput').value.trim();
+            if (!name) { $('countryInput').classList.add('err'); $('countryInput').focus(); $('countryInput').placeholder = tt('needName'); return; }
+            store('px_country', name);
+            const url = currentWsUrl();
+            if (url && !/^wss?:\/\/\S+$/i.test(url)) { $('spMode').innerText = 'ws:// / wss://'; return; }
+            store('px_server', ($('serverUrlInput').value || '').trim());
+            try {
+                sessionStorage.setItem('px_join', JSON.stringify({ room: roomId || '', url: url, mode: mode === 'duel' ? 'duel' : 'lobby' }));
+                sessionStorage.setItem('px_autojoin', '1');
+                sessionStorage.removeItem('px_token');
+            } catch (e) { /* depolama kapalı */ }
             window.location.href = 'game.html';
         }
-        (function restoreCountry() {
+        function playGame() { startGame('', 'lobby'); }
+        function playDuel() { startGame('', 'duel'); }
+        function setTab(t) { activeTab = t === 'duel' ? 'duel' : 'lobby'; store('px_tab', activeTab); renderServers(); }
+
+        let lastList = null, listBusy = false;
+        const rowEls = new Map();
+        const mk = (tag, cls) => { const e = document.createElement(tag); if (cls) e.className = cls; return e; };
+        const setText = (e, t) => { if (e.textContent !== t) e.textContent = t; };
+        const idNum = (id) => parseInt(String(id).replace(/\D/g, ''), 10) || 0;
+
+        function makeRow(initial) {
+            const d = mk('div', 'sp-row' + (initial ? '' : ' fresh'));
+            const r = { el: d, name: mk('span', 'rm-name'), bar: mk('div', 'rm-bar'), segs: mk('div', 'segs'), cnt: mk('span', 'rm-cnt'), info: mk('span', 'rm-info'), btn: mk('button', 'pixel-btn sp-btn'), max: 0, on: -1, dis: null, label: '' };
+            r.bar.appendChild(r.segs); r.bar.appendChild(r.cnt);
+            [r.name, r.bar, r.info, r.btn].forEach(x => d.appendChild(x));
+            if (!initial) setTimeout(() => d.classList.remove('fresh'), 1300);
+            return r;
+        }
+        function paintRow(r, s, now) {
+            setText(r.name, String(s.name));
+            if (r.max !== s.max) { r.segs.innerHTML = ''; for (let i = 0; i < s.max; i++) r.segs.appendChild(mk('i', 'seg')); r.max = s.max; r.on = -1; }
+            const cls = 'segs' + (s.kind === 'duel' ? ' duel' : '') + (s.max > 2 && s.players / s.max >= 0.8 ? ' hot' : '');
+            if (r.segs.className !== cls) r.segs.className = cls;
+            if (r.on !== s.players) { const ch = r.segs.children; for (let i = 0; i < ch.length; i++) ch[i].classList.toggle('on', i < s.players); r.on = s.players; }
+            setText(r.cnt, s.players + ' / ' + s.max);
+            const el = Math.floor((now - s.at) / 1000);
+            const cd = (s.countdown === null || s.countdown === undefined) ? null : Math.max(0, s.countdown - el);
+            const wait = (s.wait === null || s.wait === undefined) ? null : Math.max(0, s.wait - el);
+            const full = s.players >= s.max;
+            let txt, st;
+            if (s.infoText) { txt = s.infoText; st = 'st-wait'; }
+            else if (cd !== null) { txt = tt('startsNow') + ': ' + cd + tt('sl'); st = 'st-start'; }
+            else if (s.players === 0) { txt = tt('emptyRoom'); st = 'st-idle'; }
+            else if (s.kind === 'duel') { txt = tt('oppWait'); st = 'st-wait'; }
+            else { txt = tt('waiting') + (wait !== null ? ' · ' + tt('botIn') + ' ' + wait + tt('sl') : ''); st = 'st-wait'; }
+            setText(r.info, txt); const ic = 'rm-info ' + st; if (r.info.className !== ic) r.info.className = ic;
+            const label = full ? tt('full') : tt('join');
+            if (r.label !== label) { r.btn.textContent = label; r.label = label; }
+            if (r.dis !== full) { r.btn.disabled = full; r.dis = full; }
+            r.btn.onclick = full ? null : () => startGame(s.id.indexOf('__local') === 0 ? '' : String(s.id), s.kind);
+        }
+
+        function renderServers() {
+            const box = $('serverList');
+            if (!box.dataset.sk) {
+                box.dataset.sk = '1';
+                box.innerHTML = '<div class="sp-row hdr" id="spHdr"><span></span><span></span><span></span><span></span></div><div id="spRows"></div><div class="sp-empty" id="spMsg" style="display:none"></div>';
+            }
+            const rowsBox = $('spRows'), msgBox = $('spMsg');
+            const url = currentWsUrl(), base = apiBase(url), now = Date.now();
+            setText($('spMode'), base === '' ? tt('offlineMode') : (base === null ? 'ws:// / wss://' : tt('onlineMode')));
+            $('tabLobby').classList.toggle('active', activeTab === 'lobby'); $('tabDuel').classList.toggle('active', activeTab === 'duel');
+            setText($('spNote'), base === '' ? tt('noteOffline') : (activeTab === 'duel' ? tt('noteDuel') : tt('noteLobby')));
+            const hs = $('spHdr').children; [tt('name'), tt('players'), tt('status'), ''].forEach((x, i) => setText(hs[i], x));
+            const live = $('spLive'), streaming = !!es && es.readyState === 1;
+            live.className = 'sp-live' + (streaming ? '' : ' off');
+            setText(live, base ? ((streaming ? tt('live') : tt('liveOff')) + (lastList && !lastList.error ? ' · ' + lastList.online + ' ' + tt('online') : '')) : '—');
+
+            const showMsg = (t) => { rowsBox.style.display = 'none'; msgBox.style.display = 'block'; setText(msgBox, t); for (const r of rowEls.values()) r.el.remove(); rowEls.clear(); };
+            let list;
+            if (base === '') {   // çevrimdışı: tek yerel satır
+                list = [activeTab === 'duel'
+                    ? { id: '__local_duel', name: tt('localDuel'), kind: 'duel', players: 1, max: 2, countdown: null, wait: null, at: now, infoText: tt('localDuelInfo') }
+                    : { id: '__local_lobby', name: tt('local'), kind: 'lobby', players: 1, max: 20, countdown: null, wait: null, at: now, infoText: tt('localInfo') }];
+                setText($('tabLobbyC'), ''); setText($('tabDuelC'), '');
+            } else if (base === null) { setText($('tabLobbyC'), ''); setText($('tabDuelC'), ''); return showMsg(tt('unreachable')); }
+            else if (!lastList) { return showMsg('…'); }
+            else if (lastList.error) { return showMsg(tt('unreachable')); }
+            else {
+                const open = (k) => lastList.servers.filter(x => x.kind === k && x.players < x.max).length;
+                setText($('tabLobbyC'), open('lobby') + ' ' + tt('open')); setText($('tabDuelC'), open('duel') + ' ' + tt('open'));
+                list = lastList.servers.filter(x => x.kind === activeTab).map(x => Object.assign({}, x, { at: lastList.at }));
+                list.sort((a, b) => idNum(a.id) - idNum(b.id));
+                if (!list.length) return showMsg(tt('noServers'));
+            }
+            msgBox.style.display = 'none'; rowsBox.style.display = 'block';
+            const keep = new Set(list.map(x => x.id));
+            for (const [id, r] of Array.from(rowEls)) if (!keep.has(id)) { r.el.remove(); rowEls.delete(id); }   // başlayan oda anında kaybolur
+            const initial = rowEls.size === 0;   // ilk doldurma / sekme değişimi: parlama yok, sadece sonradan açılan odalar parlar
+            list.forEach((sv, i) => {
+                let r = rowEls.get(sv.id);
+                if (!r) { r = makeRow(initial); rowEls.set(sv.id, r); }
+                paintRow(r, sv, now);
+                if (rowsBox.children[i] !== r.el) rowsBox.insertBefore(r.el, rowsBox.children[i] || null);
+            });
+        }
+
+        let es = null, esBase = '';
+        function closeStream() { if (es) { try { es.close(); } catch (e) { /* */ } es = null; esBase = ''; } }
+        function openStream() {
+            const base = apiBase(currentWsUrl());
+            if (!base || typeof EventSource === 'undefined' || document.hidden) return closeStream();
+            if (es && esBase === base) return;
+            closeStream(); esBase = base;
+            try { es = new EventSource(base + '/api/servers/stream'); } catch (e) { es = null; return; }
+            es.onmessage = (ev) => { try { setList(JSON.parse(ev.data)); } catch (e) { /* */ } };
+            es.onopen = () => renderServers();
+            es.onerror = () => renderServers();
+        }
+        function setList(j) {
+            lastList = (j && Array.isArray(j.servers)) ? { servers: j.servers.slice(0, 100), online: (j.online | 0), at: Date.now() } : { error: true };
+            renderServers();
+        }
+        async function refreshServers(force) {
+            openStream(); renderServers();
+            const base = apiBase(currentWsUrl());
+            if (!base || listBusy) return;
+            if (document.hidden && !force) return;
+            if (!force && es && es.readyState === 1 && lastList && !lastList.error && Date.now() - lastList.at < 25000) return;   // canlı akış güncel
+            listBusy = true;
+            const ac = new AbortController(); const to = setTimeout(() => ac.abort(), 4000);
             try {
-                const saved = localStorage.getItem('px_country');
-                if (saved) document.getElementById('countryInput').value = saved;
-                document.getElementById('countryInput').addEventListener('input', function (e) {
-                    localStorage.setItem('px_country', e.target.value.trim());
-                });
-            } catch (e) { /* depolama kapalı */ }
+                const res = await fetch(base + '/api/servers', { signal: ac.signal, cache: 'no-store' });
+                if (!res.ok) throw new Error('http ' + res.status);
+                setList(await res.json());
+            } catch (e) { lastList = { error: true }; renderServers(); }
+            clearTimeout(to); listBusy = false;
+        }
+        function applyServerUrl() { lastList = null; closeStream(); store('px_server', ($('serverUrlInput').value || '').trim()); refreshServers(true); }
+        setInterval(() => refreshServers(false), 3000);                      // yedek yoklama
+        setInterval(() => { if (lastList && !lastList.error) renderServers(); }, 500);   // geri sayımı akıcı göster
+        document.addEventListener('visibilitychange', () => { if (document.hidden) closeStream(); else refreshServers(true); });
+
+        /* ------------------------------------------------------------ başlangıç */
+        function defaultFlag() { // kayıtlı bayrak yoksa: kırmızı-beyaz-kırmızı + sarı yıldız
+            $('pc1').value = '#d32f2f'; $('pc2').value = '#ffffff'; $('pc3').value = '#d32f2f';
+            renderPattern('h3', largeCtx);
+            const rows = SYMBOLS.star; largeCtx.fillStyle = '#ffd600';
+            for (let y = 0; y < 9; y++) for (let x = 0; x < 9; x++) if (rows[y][x] === '1') largeCtx.fillRect(10 + x, 3 + y, 1, 1);
+            miniCtx.drawImage(largeCanvas, 0, 0, FW, FH); store('px_flag', flagToB64(miniCanvas));
+            $('pc3').value = '#1b5e20';
+            refreshPatternThumbs();
+        }
+        (function init() {
+            miniCtx.fillStyle = 'white'; miniCtx.fillRect(0, 0, FW, FH);
+            buildPatternGrid(); buildSymbolGrid();
+            if (!b64ToCanvas(store('px_flag'), miniCanvas)) defaultFlag();
+            $('countryInput').value = store('px_country') || '';
+            $('countryInput').addEventListener('input', function (e) { e.target.classList.remove('err'); store('px_country', e.target.value.trim()); });
+            $('countryInput').addEventListener('keydown', function (e) { if (e.key === 'Enter') playGame(); });
+            $('serverUrlInput').value = metaUrl() || store('px_server') || '';
+            $('serverUrlInput').addEventListener('keydown', function (e) { if (e.key === 'Enter') applyServerUrl(); });
+            $('expVal').innerText = String(parseInt(store('px_exp') || '0', 10) || 0);
+            applyLang();
+            if (window.pxSyncLayoutButtons) pxSyncLayoutButtons();
+            refreshServers(true);
         })();
 
-        // --- AYARLAR VE DİL ---
-        function goToSettings() { document.getElementById('settingsModal').style.display = 'flex'; }
-        function closeSettings() { document.getElementById('settingsModal').style.display = 'none'; }
-        
-        function setLanguage(lang) {
-            document.getElementById('langEn').classList.remove('active');
-            document.getElementById('langTr').classList.remove('active');
-            if (lang === 'en') {
-                document.getElementById('langEn').classList.add('active');
-                document.getElementById('settingsTitle').innerText = "SETTINGS";
-                document.getElementById('langLabel').innerText = "LANGUAGE:";
-                document.getElementById('closeSettingsBtn').innerText = "BACK";
-                document.getElementById('devInfoText').innerHTML = "DEVELOPER:<br>Oyunu sadece MR_OTTO geliştirdi.";
-            } else {
-                document.getElementById('langTr').classList.add('active');
-                document.getElementById('settingsTitle').innerText = "AYARLAR";
-                document.getElementById('langLabel').innerText = "DİL SEÇENEĞİ:";
-                document.getElementById('closeSettingsBtn').innerText = "GERİ";
-                document.getElementById('devInfoText').innerHTML = "GELİŞTİRİCİ:<br>Sadece MR_OTTO tarafından geliştirildi.";
-            }
-        }
+        /* --- AYARLAR --- */
+        function goToSettings() { $('settingsModal').style.display = 'flex'; }
+        function closeSettings() { $('settingsModal').style.display = 'none'; }
+        window.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeSettings(); if ($('flagModal').style.display === 'flex') closeFlagEditor(false); } });
     </script>
 </body>
 </html>
